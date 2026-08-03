@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1032205852945",
+    "project_id": "luckyapp-afb12",
+    "storage_bucket": "luckyapp-afb12.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1032205852945:android:32ef000d31d85bfb2cacb0",
+        "android_client_info": {
+          "package_name": "com.gonza77.lucky"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAckP6KssW2D6v7PyHNzcTC279s_KouK4o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

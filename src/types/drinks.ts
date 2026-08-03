@@ -1,0 +1,132 @@
+export interface BebidaProducto {
+  id: number;
+  nombre: string;
+  descripcion?: string | null;
+  imagenUrl?: string | null;
+  precioBase: number;
+  disponibleGlobal: boolean;
+  activo: boolean;
+  fechaCreacion: string;
+}
+
+export interface CrearBebidaProductoRequest {
+  nombre: string;
+  descripcion?: string | null;
+  imagenUrl?: string | null;
+  precioBase: number;
+  disponibleGlobal: boolean;
+}
+
+export interface ActualizarBebidaProductoRequest {
+  nombre: string;
+  descripcion?: string | null;
+  imagenUrl?: string | null;
+  precioBase: number;
+  disponibleGlobal: boolean;
+  activo: boolean;
+}
+
+export interface BebidaEventoAdmin {
+  id: number;
+  eventoId: number;
+  eventoNombre: string;
+  bebidaProductoId: number;
+  nombre: string;
+  descripcion?: string | null;
+  imagenUrl?: string | null;
+  precioBase: number;
+  precioEvento?: number | null;
+  precioFinal: number;
+  disponible: boolean;
+  activo: boolean;
+}
+
+export interface BebidaDisponibleParaEvento {
+  bebidaProductoId: number;
+  bebidaEventoId?: number | null;
+  nombre: string;
+  descripcion?: string | null;
+  imagenUrl?: string | null;
+  precioBase: number;
+  precioEvento?: number | null;
+  precioFinal: number;
+  disponibleGlobal: boolean;
+  asignadaAlEvento: boolean;
+  disponibleEnEvento: boolean;
+}
+
+export interface BebidaCatalogo {
+  bebidaProductoId: number;
+  bebidaEventoId?: number | null;
+  nombre: string;
+  descripcion?: string | null;
+  imagenUrl?: string | null;
+  precio: number;
+  disponible: boolean;
+}
+
+export interface BebidaCarritoItem extends BebidaCatalogo {
+  cantidad: number;
+}
+
+export interface CrearBebidaOrdenRequest {
+  eventoId?: number | null;
+  idempotencyKey?: string | null;
+  items: {
+    bebidaProductoId: number;
+    cantidad: number;
+  }[];
+}
+
+export interface BebidaOrden {
+  id: number;
+  eventoId?: number | null;
+  eventoNombre?: string | null;
+  estado: string;
+  pagoEstado: string;
+  codigoQR: string;
+  codigoRetiro: string;
+  subtotal: number;
+  cargoServicio: number;
+  total: number;
+  fechaCreacion: string;
+  fechaPagoConfirmado?: string | null;
+  fechaEntregada?: string | null;
+  items: BebidaOrdenItem[];
+}
+
+export interface BebidaOrdenItem {
+  id: number;
+  bebidaProductoId: number;
+  nombreProducto: string;
+  precioUnitario: number;
+  cantidad: number;
+  subtotal: number;
+}
+
+export interface BebidaOrdenBarra {
+  id: number;
+  eventoNombre?: string | null;
+  estado: string;
+  pagoEstado: string;
+  codigoRetiro: string;
+  total: number;
+  fechaPagoConfirmado?: string | null;
+  fechaEntregada?: string | null;
+  puedeEntregar: boolean;
+  items: {
+    nombreProducto: string;
+    cantidad: number;
+  }[];
+}
+
+export interface CrearBebidaOrdenPagoResponse {
+  ordenId: number;
+  estado: string;
+  pagoEstado: string;
+  total: number;
+  externalReference: string;
+  preferenceId: string;
+  checkoutUrl: string;
+  sandboxCheckoutUrl?: string | null;
+}
