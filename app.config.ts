@@ -194,17 +194,19 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       "expo-router",
 
-       [
-    "expo-build-properties",
-    {
-      ios: {
-        useFrameworks: "static",
-      },
-    },
-  ],
+       
 
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
+
+      [
+    "expo-build-properties",
+    {
+      ios: {
+        useFrameworks: "dynamic",
+      },
+    },
+  ],
 
       [
         "expo-splash-screen",
