@@ -3,6 +3,7 @@
     "version": ">= 20.0.0",
     "appVersionSource": "remote"
   },
+
   "build": {
     "development": {
       "developmentClient": true,
@@ -16,6 +17,7 @@
         "buildType": "apk"
       }
     },
+
     "preview": {
       "distribution": "internal",
       "environment": "preview",
@@ -27,15 +29,17 @@
         "buildType": "apk"
       }
     },
+
     "testflight": {
       "distribution": "store",
-      "environment": "preview",
+      "environment": "production",
       "autoIncrement": true,
       "env": {
-        "APP_VARIANT": "preview",
-        "EXPO_PUBLIC_API_URL": "https://api-test.tu-entrada.com"
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_API_URL": "https://api.tu-entrada.com"
       }
     },
+
     "production": {
       "distribution": "store",
       "environment": "production",
@@ -49,11 +53,20 @@
       }
     }
   },
+
   "submit": {
-    "testflight": {},
+    "testflight": {
+      "ios": {
+        "ascAppId": "6799815791"
+      }
+    },
+
     "production": {
       "android": {
         "track": "internal"
+      },
+      "ios": {
+        "ascAppId": "6799815791"
       }
     }
   }
