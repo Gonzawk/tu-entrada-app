@@ -41,7 +41,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       : "lucky-dev";
 
   /*
-   * Identificador único según el entorno.
+   * Identificador único según entorno.
    *
    * Permite instalar Development, Testing y Production
    * simultáneamente.
@@ -53,7 +53,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       : "com.gonza77.lucky.development";
 
   /*
-   * Firebase Android según el entorno.
+   * Firebase Android según entorno.
    */
   const googleServicesFile = isProduction
     ? "./firebase/production/google-services.json"
@@ -62,14 +62,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       : "./firebase/development/google-services.json";
 
   /*
-   * Firebase iOS según el entorno.
+   * Firebase iOS según entorno.
    *
    * Deben existir:
    *
-   * firebase/testing/GoogleService-Info.plist
    * firebase/production/GoogleService-Info.plist
-   *
-   * Para Development se utilizará su propio archivo.
+   * firebase/testing/GoogleService-Info.plist
+   * firebase/development/GoogleService-Info.plist
    */
   const googleServicesPlist = isProduction
     ? "./firebase/production/GoogleService-Info.plist"
@@ -109,9 +108,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       bundleIdentifier: applicationIdentifier,
 
       /*
-       * EAS administra el valor remoto mediante:
-       * appVersionSource: remote
-       * autoIncrement: true
+       * EAS administra el build number remotamente
+       * mediante appVersionSource: remote.
        */
       buildNumber: "1",
 
@@ -125,6 +123,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
 
       infoPlist: {
+        /*
+         * Lucky utiliza solamente cifrado estándar/exento,
+         * principalmente HTTPS/TLS.
+         */
+        ITSAppUsesNonExemptEncryption: false,
+
         NSCameraUsageDescription:
           "Lucky necesita usar la cámara para escanear códigos QR de entradas, bebidas y beneficios.",
 
@@ -137,7 +141,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       package: applicationIdentifier,
 
       /*
-       * Valor inicial; EAS lo administra remotamente
+       * EAS administra versionCode remotamente
        * para builds con autoIncrement.
        */
       versionCode: 1,
@@ -194,19 +198,42 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       "expo-router",
 
-       
+      /*
+       * React Native Firebase.
+       *
+       * Deshabilitamos SPM en iOS para utilizar CocoaPods
+       * junto con static frameworks.
+       */
+      [
+        "@react-native-firebase/app",
+        {
+          ios: {
+            disableSPM: true,
+          },
+        },
+      ],
 
-      "@react-native-firebase/app",
       "@react-native-firebase/auth",
 
+      /*
+       * Configuración nativa iOS para React Native Firebase.
+       *
+       * RNFBApp y RNFBAuth se enlazan estáticamente para evitar
+       * los errores de headers no modulares encontrados en Xcode.
+       */
       [
-    "expo-build-properties",
-    {
-      ios: {
-        useFrameworks: "dynamic",
-      },
-    },
-  ],
+        "expo-build-properties",
+        {
+          ios: {
+            useFrameworks: "static",
+
+            forceStaticLinking: [
+              "RNFBApp",
+              "RNFBAuth",
+            ],
+          },
+        },
+      ],
 
       [
         "expo-splash-screen",
