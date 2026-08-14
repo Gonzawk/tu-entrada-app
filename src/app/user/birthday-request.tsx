@@ -25,6 +25,12 @@ type EventoBasico = {
   nombre: string;
 };
 
+type DniImageFile = {
+  uri: string;
+  name: string;
+  type: string;
+};
+
 export default function BirthdayRequestScreen() {
   const [eventos, setEventos] = useState<EventoBasico[]>([]);
   const [solicitudes, setSolicitudes] = useState<BirthdayRequest[]>([]);
@@ -38,12 +44,12 @@ export default function BirthdayRequestScreen() {
   const [eventoId, setEventoId] = useState<number | null>(null);
   const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [dni, setDni] = useState("");
-  const [fotoDniUrl, setFotoDniUrl] = useState("");
+  const [fotoDniFile, setFotoDniFile] = useState<DniImageFile | null>(null);
+  const [fotoDniPreview, setFotoDniPreview] = useState("");
   const [cantidadInvitados, setCantidadInvitados] = useState("10");
 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     load();
@@ -61,9 +67,14 @@ export default function BirthdayRequestScreen() {
       setEventos(eventosData.items ?? []);
       setSolicitudes(solicitudesData ?? []);
 
-      if ((eventosData.items ?? []).length > 0) {
-        setEventoId(eventosData.items[0].id);
-      }
+      // El usuario debe seleccionar explícitamente un evento disponible.
+      setEventoId((actual) => {
+        const sigueDisponible = (eventosData.items ?? []).some(
+          (evento: EventoBasico) => evento.id === actual
+        );
+
+        return sigueDisponible ? actual : null;
+      });
     } catch (e: any) {
       Alert.alert(
         "Error",
@@ -74,13 +85,16 @@ export default function BirthdayRequestScreen() {
     }
   }
 
-  async function subirFotoDni() {
+  async function seleccionarFotoDni() {
     try {
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permission.granted) {
-        Alert.alert("Permiso requerido", "Necesitamos acceso a tus imágenes.");
+        Alert.alert(
+          "Permiso requerido",
+          "Necesitamos acceso a tus imágenes para seleccionar la foto del DNI."
+        );
         return;
       }
 
@@ -90,36 +104,25 @@ export default function BirthdayRequestScreen() {
         allowsEditing: true,
       });
 
-      if (result.canceled) return;
-
-      setUploading(true);
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
 
       const asset = result.assets[0];
 
-      const uploadResult = await subirImagenApi({
+      setFotoDniFile({
         uri: asset.uri,
         name: asset.fileName ?? `dni-${Date.now()}.jpg`,
         type: asset.mimeType ?? "image/jpeg",
       });
 
-      const url =
-        uploadResult?.data?.url ??
-        uploadResult?.data?.display_url ??
-        uploadResult?.data?.image?.url;
-
-      if (!url) {
-        Alert.alert("Error", "No se recibió la URL de la imagen.");
-        return;
-      }
-
-      setFotoDniUrl(url);
-    } catch (e: any) {
+      // Preview local. La imagen todavía NO se sube a ImgBB.
+      setFotoDniPreview(asset.uri);
+    } catch {
       Alert.alert(
         "Error",
-        String(e?.response?.data?.message ?? "No se pudo subir la imagen.")
+        "No se pudo seleccionar la imagen del DNI."
       );
-    } finally {
-      setUploading(false);
     }
   }
 
@@ -133,8 +136,15 @@ export default function BirthdayRequestScreen() {
         return;
       }
 
-      if (!eventoId) {
-        Alert.alert("Falta evento", "Seleccioná un evento.");
+      const eventoSeleccionado = eventos.find(
+        (evento) => evento.id === eventoId
+      );
+
+      if (!eventoId || !eventoSeleccionado) {
+        Alert.alert(
+          "Falta evento",
+          "Seleccioná un evento disponible antes de enviar la solicitud."
+        );
         return;
       }
 
@@ -148,8 +158,8 @@ export default function BirthdayRequestScreen() {
         return;
       }
 
-      if (!fotoDniUrl) {
-        Alert.alert("Falta foto", "Subí una foto del DNI.");
+      if (!fotoDniFile) {
+        Alert.alert("Falta foto", "Seleccioná una foto del DNI.");
         return;
       }
 
@@ -162,6 +172,22 @@ export default function BirthdayRequestScreen() {
 
       setSending(true);
 
+      /*
+       * La imagen se sube únicamente cuando toda la solicitud
+       * ya pasó las validaciones del frontend.
+       */
+      const fotoDniUrl = await subirImagenApi(fotoDniFile);
+
+      if (!fotoDniUrl) {
+        throw new Error(
+          "No se pudo obtener la URL de la foto del DNI."
+        );
+      }
+
+      /*
+       * El backend vuelve a validar que el evento continúe
+       * Publicado + Activo + No eliminado antes de crear la solicitud.
+       */
       await crearSolicitudCumpleaniosApi({
         eventoId,
         fechaNacimiento,
@@ -172,9 +198,11 @@ export default function BirthdayRequestScreen() {
 
       Alert.alert("Correcto", "Solicitud enviada correctamente.");
 
+      setEventoId(null);
       setFechaNacimiento("");
       setDni("");
-      setFotoDniUrl("");
+      setFotoDniFile(null);
+      setFotoDniPreview("");
       setCantidadInvitados("10");
 
       await load();
@@ -191,6 +219,10 @@ export default function BirthdayRequestScreen() {
       setSending(false);
     }
   }
+
+  const eventoSeleccionado = eventos.find(
+    (evento) => evento.id === eventoId
+  );
 
   if (loading) {
     return (
@@ -213,65 +245,85 @@ export default function BirthdayRequestScreen() {
           </Text>
 
           <Text style={styles.label}>Evento</Text>
+          <Text style={styles.eventHelp}>
+            Seleccioná el evento para el cual querés solicitar el beneficio.
+          </Text>
 
-          {eventos.map((evento) => {
-            const selected = evento.id === eventoId;
-
-            return (
-              <Pressable
-                key={evento.id}
-                style={[styles.option, selected && styles.optionSelected]}
-                onPress={() => setEventoId(evento.id)}
-              >
-                <Text style={styles.optionText}>{evento.nombre}</Text>
-              </Pressable>
-            );
-          })}
-
-          <Input
-            label="Fecha nacimiento YYYY-MM-DD"
-            value={fechaNacimiento}
-            setValue={setFechaNacimiento}
-          />
-
-          <Input label="DNI" value={dni} setValue={setDni} />
-
-          <Input
-            label="Cantidad invitados"
-            value={cantidadInvitados}
-            setValue={setCantidadInvitados}
-            keyboardType="numeric"
-          />
-
-          {fotoDniUrl ? (
-            <Image source={{ uri: fotoDniUrl }} style={styles.preview} />
-          ) : null}
-
-          <Pressable
-            style={[styles.secondaryButton, uploading && styles.disabled]}
-            onPress={subirFotoDni}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.buttonText}>
-                {fotoDniUrl ? "Cambiar foto DNI" : "Subir foto DNI"}
+          {eventos.length === 0 ? (
+            <View style={styles.noEventsBox}>
+              <Text style={styles.noEventsTitle}>
+                No hay eventos publicados disponibles
               </Text>
-            )}
-          </Pressable>
+              <Text style={styles.noEventsText}>
+                La solicitud de cumpleaños solo puede realizarse para un evento
+                publicado. Volvé a consultar cuando haya un nuevo evento disponible.
+              </Text>
+            </View>
+          ) : (
+            <>
+              {eventos.map((evento) => {
+                const selected = evento.id === eventoId;
 
-          <Pressable
-            style={[styles.primaryButton, sending && styles.disabled]}
-            onPress={enviarSolicitud}
-            disabled={sending || !eventoId || !fechaNacimiento || !dni || !fotoDniUrl}
-          >
-            {sending ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.buttonText}>Enviar solicitud</Text>
-            )}
-          </Pressable>
+                return (
+                  <Pressable
+                    key={evento.id}
+                    style={[styles.option, selected && styles.optionSelected]}
+                    onPress={() => setEventoId(evento.id)}
+                    disabled={sending}
+                  >
+                    <Text style={styles.optionText}>{evento.nombre}</Text>
+                  </Pressable>
+                );
+              })}
+
+              <Input
+                label="Fecha nacimiento YYYY-MM-DD"
+                value={fechaNacimiento}
+                setValue={setFechaNacimiento}
+              />
+
+              <Input label="DNI" value={dni} setValue={setDni} />
+
+              <Input
+                label="Cantidad invitados"
+                value={cantidadInvitados}
+                setValue={setCantidadInvitados}
+                keyboardType="numeric"
+              />
+
+              {fotoDniPreview ? (
+                <Image source={{ uri: fotoDniPreview }} style={styles.preview} />
+              ) : null}
+
+              <Pressable
+                style={[styles.secondaryButton, sending && styles.disabled]}
+                onPress={seleccionarFotoDni}
+                disabled={sending || !eventoSeleccionado}
+              >
+                <Text style={styles.buttonText}>
+                  {fotoDniFile ? "Cambiar foto DNI" : "Seleccionar foto DNI"}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.primaryButton, sending && styles.disabled]}
+                onPress={enviarSolicitud}
+                disabled={
+                  sending ||
+                  !eventoSeleccionado ||
+                  !fechaNacimiento.trim() ||
+                  !dni.trim() ||
+                  !fotoDniFile
+                }
+              >
+                {sending ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.buttonText}>Enviar solicitud</Text>
+                )}
+              </Pressable>
+            </>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Mis solicitudes</Text>
@@ -336,6 +388,30 @@ const styles = StyleSheet.create({
   subTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "900" },
   muted: { color: "#BDBDBD", marginTop: 6 },
   label: { color: "#FFFFFF", fontWeight: "900", marginTop: 16 },
+  eventHelp: {
+    color: "#BDBDBD",
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  noEventsBox: {
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,209,102,0.10)",
+    borderWidth: 1,
+    borderColor: "rgba(255,209,102,0.35)",
+  },
+  noEventsTitle: {
+    color: "#FFD166",
+    fontSize: 16,
+    fontWeight: "900",
+    marginBottom: 6,
+  },
+  noEventsText: {
+    color: "#FFD166",
+    fontWeight: "700",
+    lineHeight: 20,
+  },
   input: {
     minHeight: 48,
     borderRadius: 14,

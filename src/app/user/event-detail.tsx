@@ -344,12 +344,13 @@ export default function EventDetailScreen() {
           }
         >
           {evento.bannerUrl ? (
-            <Image
-              source={{
-                uri: evento.bannerUrl,
-              }}
-              style={styles.banner}
-            />
+           <Image
+  source={{
+    uri: evento.bannerUrl,
+  }}
+  style={styles.banner}
+  resizeMode="cover"
+/>
           ) : null}
 
           <Text style={styles.title}>
@@ -681,11 +682,11 @@ const styles =
       paddingBottom: 32,
     },
     banner: {
-      width: "100%",
-      height: 190,
-      borderRadius: 24,
-      backgroundColor: "#1A1A1A",
-    },
+  width: "100%",
+  aspectRatio: 16 / 9,
+  borderRadius: 24,
+  backgroundColor: "#1A1A1A",
+},
     title: {
       color: "#FFFFFF",
       fontSize: 28,

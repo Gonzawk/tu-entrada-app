@@ -27,22 +27,25 @@ export async function getBebidasAdminApi(params?: {
   return response.data;
 }
 
-export async function crearBebidaAdminApi(formData: FormData) {
-  const response = await apiClient.post("/api/admin/bebidas", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+export async function crearBebidaAdminApi(
+  formData: FormData
+) {
+  const response = await apiClient.post(
+    "/api/admin/bebidas",
+    formData
+  );
 
   return response.data;
 }
 
-export async function actualizarBebidaAdminApi(id: number, formData: FormData) {
-  const response = await apiClient.put(`/api/admin/bebidas/${id}`, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
+export async function actualizarBebidaAdminApi(
+  id: number,
+  formData: FormData
+) {
+  const response = await apiClient.put(
+    `/api/admin/bebidas/${id}`,
+    formData
+  );
 
   return response.data;
 }

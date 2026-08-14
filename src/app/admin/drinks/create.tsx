@@ -16,6 +16,7 @@ import {
   crearBebidaAdminApi,
   getBebidasAdminApi,
 } from "../../../api/drinksApi";
+import { subirImagenApi } from "../../../api/imagesApi";
 import { AppLayout } from "../../../components/shared/AppLayout";
 import { RoleGuard } from "../../../components/shared/RoleGuard";
 import { formatMoney } from "../../../utils/formatMoney";
@@ -122,71 +123,142 @@ export default function AdminCreateDrinkScreen() {
     }
   }
 
-  function crearFormData(precio: number) {
-    const formData = new FormData();
+  function crearFormData(
+  precio: number,
+  finalImagenUrl: string
+) {
+  const formData = new FormData();
 
-    formData.append("nombre", nombre.trim());
-    formData.append("descripcion", descripcion.trim() || "");
-    formData.append("precioBase", String(precio));
-    formData.append("disponibleGlobal", String(disponibleGlobal));
+  formData.append(
+    "nombre",
+    nombre.trim()
+  );
 
-    if (isEdit) {
-      formData.append("activo", String(activo));
-    }
+  formData.append(
+    "descripcion",
+    descripcion.trim()
+  );
 
-    if (imagenFile) {
-      formData.append("imagen", {
-        uri: imagenFile.uri,
-        name: imagenFile.name,
-        type: imagenFile.type,
-      } as any);
-    } else if (imagenUrl.trim() && !imagenUrl.startsWith("file:")) {
-      formData.append("imagenUrl", imagenUrl.trim());
-    }
+  formData.append(
+    "precioBase",
+    String(precio)
+  );
 
-    return formData;
+  formData.append(
+    "disponibleGlobal",
+    String(disponibleGlobal)
+  );
+
+  if (isEdit) {
+    formData.append(
+      "activo",
+      String(activo)
+    );
   }
 
-  async function guardar() {
-    try {
-      if (!nombre.trim()) {
-        Alert.alert("Faltan datos", "El nombre es obligatorio.");
-        return;
-      }
+  if (finalImagenUrl.trim()) {
+    formData.append(
+      "imagenUrl",
+      finalImagenUrl.trim()
+    );
+  }
 
-      const precio = Number(precioBase.replace(",", "."));
+  return formData;
+}
 
-      if (Number.isNaN(precio) || precio < 0) {
-        Alert.alert("Precio inválido", "Ingresá un precio válido.");
-        return;
-      }
-
-      setSaving(true);
-
-      const formData = crearFormData(precio);
-
-      if (isEdit && id) {
-        await actualizarBebidaAdminApi(id, formData);
-        Alert.alert("Correcto", "Bebida actualizada.");
-      } else {
-        await crearBebidaAdminApi(formData);
-        Alert.alert("Correcto", "Bebida creada.");
-      }
-
-      router.replace("/admin/drinks" as never);
-    } catch (e: any) {
+ async function guardar() {
+  try {
+    if (!nombre.trim()) {
       Alert.alert(
-        "Error",
-        String(
-          e?.response?.data?.message ??
-            e?.response?.data ??
-            "No se pudo guardar."
-        )
+        "Faltan datos",
+        "El nombre es obligatorio."
       );
-    } finally {
-      setSaving(false);
+      return;
     }
+
+    const precio = Number(
+      precioBase.replace(",", ".")
+    );
+
+    if (Number.isNaN(precio) || precio < 0) {
+      Alert.alert(
+        "Precio inválido",
+        "Ingresá un precio válido."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    /*
+     * Si estamos editando y no seleccionamos
+     * una nueva imagen, conservamos la URL actual.
+     */
+    let finalImagenUrl = imagenUrl.trim();
+
+    /*
+     * Si el administrador seleccionó una nueva
+     * imagen desde el dispositivo, primero se
+     * sube a ImgBB mediante nuestra API.
+     */
+    if (imagenFile) {
+      finalImagenUrl =
+        await subirImagenApi(imagenFile);
+    }
+
+    /*
+     * La API de bebidas recibe solamente
+     * la URL definitiva de la imagen.
+     */
+    const formData = crearFormData(
+      precio,
+      finalImagenUrl
+    );
+
+    if (isEdit && id) {
+      await actualizarBebidaAdminApi(
+        id,
+        formData
+      );
+
+      Alert.alert(
+        "Correcto",
+        "Bebida actualizada correctamente."
+      );
+    } else {
+      await crearBebidaAdminApi(
+        formData
+      );
+
+      Alert.alert(
+        "Correcto",
+        "Bebida creada correctamente."
+      );
+    }
+
+    router.replace(
+      "/admin/drinks" as never
+    );
+  } catch (e: any) {
+    console.log("ERROR GUARDANDO BEBIDA:", {
+      status: e?.response?.status,
+      data: e?.response?.data,
+      message: e?.message,
+    });
+
+    Alert.alert(
+      "Error",
+      String(
+        e?.response?.data?.message ??
+          e?.response?.data ??
+          e?.message ??
+          "No se pudo guardar la bebida."
+      )
+    );
+  } finally {
+    setSaving(false);
   }
+}
 
   if (loadingEdit) {
     return (

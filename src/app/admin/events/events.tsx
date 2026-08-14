@@ -16,6 +16,7 @@ import {
 import {
   cambiarEstadoEventoAdminApi,
   getEventosAdminApi,
+  publicarEventoAdminApi,
 } from "../../../api/adminApi";
 import { AppLayout } from "../../../components/shared/AppLayout";
 import { RoleGuard } from "../../../components/shared/RoleGuard";
@@ -219,6 +220,49 @@ export default function AdminEventsScreen() {
     }
   }
 
+  async function publicarEvento(eventoId: number) {
+  try {
+    const eventoActual =
+      eventos.find((x) => x.id === eventoId);
+
+    const estadoAnterior =
+      eventoActual?.estado;
+
+    await publicarEventoAdminApi(eventoId);
+
+    setEventos((prev) =>
+      prev.map((evento) =>
+        evento.id === eventoId
+          ? {
+              ...evento,
+              estado: "Publicado",
+            }
+          : evento
+      )
+    );
+
+    if (estadoAnterior) {
+      actualizarResumenLocal(
+        estadoAnterior,
+        "Publicado"
+      );
+    }
+
+    Alert.alert(
+      "Evento publicado",
+      "El evento fue publicado correctamente y se notificó a los dispositivos habilitados."
+    );
+  } catch (error: unknown) {
+    Alert.alert(
+      "No se pudo publicar",
+      getErrorMessage(
+        error,
+        "No se pudo publicar el evento."
+      )
+    );
+  }
+}
+
   function renderHeader() {
     return (
       <View>
@@ -287,7 +331,9 @@ export default function AdminEventsScreen() {
           {evento.estado !== "Publicado" ? (
             <Pressable
               style={styles.publishButton}
-              onPress={() => cambiarEstado(evento.id, EVENTO_ESTADOS.PUBLICADO)}
+              onPress={() =>
+  publicarEvento(evento.id)
+}
             >
               <Text style={styles.actionText}>Publicar</Text>
             </Pressable>

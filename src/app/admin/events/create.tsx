@@ -19,6 +19,24 @@ function buildArgentinaDateTime(date: string, time: string) {
   return `${date.trim()}T${time.trim()}:00-03:00`;
 }
 
+type ImageUploadKey = "banner" | "principal";
+
+function getImageExtension(mimeType?: string | null) {
+  switch (mimeType?.toLowerCase()) {
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/heic":
+    case "image/heif":
+      return "heic";
+    case "image/jpeg":
+    case "image/jpg":
+    default:
+      return "jpg";
+  }
+}
+
 export default function AdminCreateEventScreen() {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -38,58 +56,92 @@ export default function AdminCreateEventScreen() {
 
   const fechaInicio = buildArgentinaDateTime(fechaInicioDia, fechaInicioHora);
   const fechaFin = buildArgentinaDateTime(fechaFinDia, fechaFinHora);
-
- async function pickAndUploadImage(
-  onUploaded: (url: string) => void,
-  uploadKey: string
-) {
-  try {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert("Permiso requerido", "Necesitamos acceso a tus imágenes.");
+  async function pickAndUploadImage(
+    onUploaded: (url: string) => void,
+    uploadKey: ImageUploadKey
+  ) {
+    if (uploadingImageKey !== null) {
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.85,
-      allowsEditing: true,
-    });
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (result.canceled || result.assets.length === 0) return;
+      if (!permission.granted) {
+        Alert.alert(
+          "Permiso requerido",
+          "Necesitamos acceso a tus imágenes."
+        );
+        return;
+      }
 
-    const asset = result.assets[0];
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.9,
+        allowsEditing: true,
+        aspect:
+          uploadKey === "banner"
+            ? [16, 9]
+            : [1, 1],
+      });
 
-    setUploadingImageKey(uploadKey);
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
 
-    const uploadResult = await subirImagenAdminApi({
-      uri: asset.uri,
-      name: asset.fileName ?? `evento-${Date.now()}.jpg`,
-      type: asset.mimeType ?? "image/jpeg",
-    });
+      const asset = result.assets[0];
 
-    const url = uploadResult.url;
+      if (!asset.uri) {
+        Alert.alert(
+          "Imagen inválida",
+          "No se pudo obtener la imagen seleccionada."
+        );
+        return;
+      }
 
-    if (!url) {
-      Alert.alert("Error", "No se recibió una URL válida de la imagen.");
-      return;
+      const extension = getImageExtension(asset.mimeType);
+
+      const file = {
+        uri: asset.uri,
+        name:
+          asset.fileName ??
+          `evento-${uploadKey}-${Date.now()}.${extension}`,
+        type: asset.mimeType ?? "image/jpeg",
+      };
+
+      setUploadingImageKey(uploadKey);
+
+      const uploadResult =
+        await subirImagenAdminApi(file);
+
+      const url =
+        uploadResult?.url ??
+        uploadResult?.displayUrl;
+
+      if (!url) {
+        Alert.alert(
+          "Error",
+          "No se recibió una URL válida de la imagen."
+        );
+        return;
+      }
+
+      onUploaded(url);
+    } catch (e: any) {
+      Alert.alert(
+        "Error",
+        String(
+          e?.response?.data?.message ??
+            e?.response?.data ??
+            e?.message ??
+            "No se pudo subir la imagen."
+        )
+      );
+    } finally {
+      setUploadingImageKey(null);
     }
-
-    onUploaded(url);
-  } catch (e: any) {
-    Alert.alert(
-      "Error",
-      String(
-        e?.response?.data?.message ??
-          e?.response?.data ??
-          "No se pudo subir la imagen."
-      )
-    );
-  } finally {
-    setUploadingImageKey(null);
   }
-}
 
   async function crearEvento() {
     try {
@@ -140,7 +192,11 @@ export default function AdminCreateEventScreen() {
 
         <View style={styles.previewCard}>
           {bannerUrl ? (
-            <Image source={{ uri: bannerUrl }} style={styles.previewBanner} />
+            <Image
+              source={{ uri: bannerUrl }}
+              style={styles.previewBanner}
+              resizeMode="cover"
+            />
           ) : (
             <Pressable
               style={styles.previewBannerEmpty}
@@ -193,6 +249,11 @@ export default function AdminCreateEventScreen() {
             Se enviará a la API con zona horaria Argentina: -03:00.
           </Text>
 
+          <Text style={styles.imageHelpText}>
+            Banner recomendado: 1920 × 1080 px (16:9). La imagen se recortará
+            automáticamente a esa proporción antes de subirse.
+          </Text>
+
           <Pressable
             style={styles.uploadButton}
             onPress={() => pickAndUploadImage(setBannerUrl, "banner")}
@@ -208,7 +269,11 @@ export default function AdminCreateEventScreen() {
           </Pressable>
 
           {bannerUrl ? (
-            <Image source={{ uri: bannerUrl }} style={styles.previewImage} />
+            <Image
+  source={{ uri: bannerUrl }}
+  style={styles.previewBanner}
+  resizeMode="cover"
+/>
           ) : null}
 
           <Pressable
@@ -226,7 +291,11 @@ export default function AdminCreateEventScreen() {
           </Pressable>
 
           {imagenPrincipalUrl ? (
-            <Image source={{ uri: imagenPrincipalUrl }} style={styles.previewImage} />
+            <Image
+              source={{ uri: imagenPrincipalUrl }}
+              style={styles.previewMainImage}
+              resizeMode="cover"
+            />
           ) : null}
 
           <Pressable
@@ -289,14 +358,14 @@ const styles = StyleSheet.create({
   },
   previewBanner: {
     width: "100%",
-    height: 170,
+    aspectRatio: 16 / 9,
     borderRadius: 20,
     backgroundColor: "#1A1A1A",
     marginBottom: 14,
   },
   previewBannerEmpty: {
     width: "100%",
-    height: 170,
+    aspectRatio: 16 / 9,
     borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
@@ -366,14 +435,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   helpText: {
-    color: "#BDBDBD",
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 10,
-  },
+  color: "#BDBDBD",
+  fontSize: 12,
+  lineHeight: 17,
+},
+
+imageHelpText: {
+  color: "#AFAFAF",
+  fontSize: 12,
+  lineHeight: 18,
+  marginTop: 4,
+  marginBottom: 2,
+},
+
+row: {
+  flexDirection: "row",
+  gap: 10,
+},
   input: {
     minHeight: 48,
     borderRadius: 14,
@@ -389,9 +467,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     textAlignVertical: "top",
   },
-  previewImage: {
+  previewMainImage: {
     width: "100%",
-    height: 140,
+    aspectRatio: 1,
     borderRadius: 16,
     backgroundColor: "#1A1A1A",
   },
