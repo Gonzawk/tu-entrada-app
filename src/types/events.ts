@@ -1,4 +1,5 @@
 import { TipoEntradaBebidaIncluidaAdmin } from "./admin";
+
 export interface EventoActivo {
   id: number;
   nombre: string;
@@ -99,6 +100,7 @@ export interface EntradaDisponible {
 
   tandaActual: TandaActual | null;
 }
+
 export interface RRPPDisponible {
   id: number;
   eventoId: number;
@@ -129,10 +131,31 @@ export interface TandaEntradaAdmin {
   estado: string | number;
   activa: boolean;
 
+  /**
+   * true  => tanda exclusiva para Ventanilla física.
+   * false => tanda disponible para el canal online.
+   */
+  habilitadaVentaFisica: boolean;
+
   fechaInicio?: string | null;
   fechaFin?: string | null;
 
   fechaCreacion?: string;
+}
+
+/**
+ * Payload usado al crear una nueva tanda.
+ * Se exporta también desde este archivo para que el frontend
+ * mantenga el mismo contrato en creación y actualización.
+ */
+export interface CrearTandaRequest {
+  numeroTanda: number;
+  nombre: string;
+  precio: number;
+  cantidadTotal: number;
+  fechaInicio?: string | null;
+  fechaFin?: string | null;
+  habilitadaVentaFisica: boolean;
 }
 
 export interface ActualizarTandaEntradaRequest {
@@ -142,6 +165,7 @@ export interface ActualizarTandaEntradaRequest {
   cantidadTotal: number;
   fechaInicio?: string | null;
   fechaFin?: string | null;
+  habilitadaVentaFisica: boolean;
 }
 
 export interface TipoEntradaAdmin {
@@ -160,8 +184,8 @@ export interface TipoEntradaAdmin {
   horaIngresoDesde?: string | null;
   horaIngresoHasta?: string | null;
   activo: boolean;
-   eliminado: boolean;
-   bebidasIncluidas: TipoEntradaBebidaIncluidaAdmin[];
+  eliminado: boolean;
+  bebidasIncluidas: TipoEntradaBebidaIncluidaAdmin[];
   tandas: TandaEntradaAdmin[];
 }
 

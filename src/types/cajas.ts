@@ -1,5 +1,10 @@
 export type TipoCaja = 1 | 2; // 1 Barra, 2 Ventanilla
-export type MetodoPagoPresencial = 1 | 2; // 1 Efectivo, 2 Transferencia
+
+export type MetodoPagoPresencial =
+  | 1 // Efectivo
+  | 2 // Transferencia
+  | 3 // Mercado Pago Point
+  | 4; // Efectivo + Mercado Pago Point
 
 export interface CajaMovimiento {
   id: number;
@@ -18,16 +23,23 @@ export interface Caja {
   eventoNombre?: string | null;
   tipoCaja: string;
   estado: string;
+
   montoInicial: number;
+
   totalEfectivo: number;
   totalTransferencia: number;
+  totalMercadoPago: number;
   totalGeneral: number;
+
   totalEfectivoARendir?: number;
-totalGeneralARendir?: number;
+  totalGeneralARendir?: number;
+
   observacionApertura?: string | null;
   observacionCierre?: string | null;
+
   fechaApertura: string;
   fechaCierre?: string | null;
+
   movimientos: CajaMovimiento[];
 }
 

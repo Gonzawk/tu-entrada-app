@@ -205,6 +205,14 @@ export default function AdminDrinksScreen() {
                 ? "Disponible globalmente"
                 : "No disponible"}
             </Text>
+
+            <Text
+              style={item.manejaStock ? styles.stockActive : styles.stockInactive}
+            >
+              {item.manejaStock
+                ? `Stock global libre: ${item.stockDisponible ?? 0}`
+                : "Sin control de stock"}
+            </Text>
           </View>
         </View>
 
@@ -249,12 +257,27 @@ export default function AdminDrinksScreen() {
     <RoleGuard allowedRoles={["Admin", "SuperAdmin"]}>
       <AppLayout title="Bebidas" scroll={false}>
         <View style={styles.screen}>
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => router.push("/admin/drinks/create" as never)}
-          >
-            <Text style={styles.primaryText}>Crear bebida</Text>
-          </Pressable>
+          <View style={styles.topActions}>
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => router.push("/admin/drinks/create" as never)}
+            >
+              <Text style={styles.primaryText}>Crear bebida</Text>
+            </Pressable>
+
+            <Pressable
+              style={styles.summaryButton}
+              onPress={() =>
+                router.push(
+                  "/admin/barra/barra-sales-summary" as never
+                )
+              }
+            >
+              <Text style={styles.summaryButtonText}>
+                Ver resumen de ventas
+              </Text>
+            </Pressable>
+          </View>
 
           <TextInput
             placeholder="Buscar bebida por nombre o descripción..."
@@ -319,12 +342,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  topActions: {
+    gap: 10,
+    marginBottom: 14,
+  },
   primaryButton: {
     backgroundColor: "#E50914",
     padding: 14,
     borderRadius: 16,
     alignItems: "center",
-    marginBottom: 14,
+  },
+  summaryButton: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    padding: 14,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  summaryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
   },
   primaryText: {
     color: "#FFFFFF",
@@ -393,6 +431,16 @@ const styles = StyleSheet.create({
   inactive: {
     color: "#FF4D57",
     marginTop: 6,
+    fontWeight: "800",
+  },
+  stockActive: {
+    color: "#20D67B",
+    marginTop: 5,
+    fontWeight: "800",
+  },
+  stockInactive: {
+    color: "#9A9A9A",
+    marginTop: 5,
     fontWeight: "800",
   },
   actions: {

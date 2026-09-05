@@ -116,6 +116,7 @@ export function AppLayout({
 
     configuracion: visibleItemsWithoutProfile.filter((item) =>
       ["/admin/system-config",
+        "/admin/mercadopago/",
         "/admin/account-deletion"
       ].includes(item.route)
     ),

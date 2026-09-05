@@ -75,6 +75,7 @@ export const APP_MENU_ITEMS: AppMenuItem[] = [
   { label: "Bebidas", route: "/admin/drinks", roles: ["Admin", "SuperAdmin"] },
   { label: "Cajas", route: "/admin/cajas/cajas", roles: ["Admin", "SuperAdmin"] },
   { label: "Configuración sistema", route: "/admin/system-config", roles: ["SuperAdmin"] },
+  { label: "Terminales POS", route: "/admin/mercadopago/", roles: ["Admin", "SuperAdmin"] },
   { label: "Estadísticas", route: "/admin/estadisticas/stats", roles: ["Admin", "SuperAdmin"] },
   { label: "Alertas fraude", route: "/admin/fraudes/fraud-alerts", roles: ["Admin", "SuperAdmin"] },
   { label: "Solicitudes eliminación de cuenta", route: "/admin/account-deletion", roles: ["Admin", "SuperAdmin"] },

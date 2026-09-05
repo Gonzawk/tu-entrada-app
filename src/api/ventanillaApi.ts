@@ -1,5 +1,8 @@
 import { PagedResponse } from "../types/common";
 import {
+  VentaPresencialEstadoPagoResponse,
+} from "../types/mercadoPagoPoint";
+import {
   CrearVentaVentanillaRequest,
   VentaVentanilla,
   VentanillaCaja,
@@ -29,6 +32,28 @@ export async function crearVentaVentanillaApi(
     "/api/ventanilla/ventas",
     data
   );
+
+  return response.data;
+}
+
+export async function getEstadoPagoVentaVentanillaApi(
+  ventaId: number
+): Promise<VentaPresencialEstadoPagoResponse> {
+  const response =
+    await apiClient.get<VentaPresencialEstadoPagoResponse>(
+      `/api/ventanilla/ventas/${ventaId}/estado-pago`
+    );
+
+  return response.data;
+}
+
+export async function cancelarPagoPointVentaVentanillaApi(
+  ventaId: number
+): Promise<VentaPresencialEstadoPagoResponse> {
+  const response =
+    await apiClient.post<VentaPresencialEstadoPagoResponse>(
+      `/api/ventanilla/ventas/${ventaId}/cancelar-pago`
+    );
 
   return response.data;
 }
@@ -94,7 +119,7 @@ export async function getVentasMiCajaVentanillaApi(params: {
   page?: number;
   pageSize?: number;
 }): Promise<PagedResponse<VentaVentanilla>> {
-  const response = await apiClient.get(
+  const response = await apiClient.get<PagedResponse<VentaVentanilla>>(
     `/api/ventanilla/mis-cajas/${params.cajaId}/ventas`,
     {
       params: {

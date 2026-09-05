@@ -1,5 +1,8 @@
 import { PagedResponse } from "../types/common";
+
 import {
+  ActualizarBebidaEventoRequest,
+  AsignarBebidaMasivoItemRequest,
   BebidaCatalogo,
   BebidaDisponibleParaEvento,
   BebidaEventoAdmin,
@@ -7,22 +10,32 @@ import {
   BebidaOrdenBarra,
   BebidaProducto,
   CrearBebidaOrdenPagoResponse,
-  CrearBebidaOrdenRequest
+  CrearBebidaOrdenRequest,
 } from "../types/drinks";
+
 import { apiClient } from "./apiClient";
+
+/*
+ * =========================================================
+ * ADMIN - PRODUCTOS DE BEBIDAS
+ * =========================================================
+ */
 
 export async function getBebidasAdminApi(params?: {
   page?: number;
   pageSize?: number;
   search?: string;
 }): Promise<PagedResponse<BebidaProducto>> {
-  const response = await apiClient.get("/api/admin/bebidas", {
-    params: {
-      page: params?.page ?? 1,
-      pageSize: params?.pageSize ?? 10,
-      search: params?.search ?? "",
-    },
-  });
+  const response = await apiClient.get(
+    "/api/admin/bebidas",
+    {
+      params: {
+        page: params?.page ?? 1,
+        pageSize: params?.pageSize ?? 10,
+        search: params?.search ?? "",
+      },
+    }
+  );
 
   return response.data;
 }
@@ -56,16 +69,29 @@ export async function cambiarDisponibilidadGlobalBebidaApi(
 ) {
   const response = await apiClient.patch(
     `/api/admin/bebidas/${bebidaProductoId}/disponibilidad`,
-    { disponible }
+    {
+      disponible,
+    }
   );
 
   return response.data;
 }
 
-export async function eliminarBebidaAdminApi(bebidaProductoId: number) {
-  const response = await apiClient.delete(`/api/admin/bebidas/${bebidaProductoId}`);
+export async function eliminarBebidaAdminApi(
+  bebidaProductoId: number
+) {
+  const response = await apiClient.delete(
+    `/api/admin/bebidas/${bebidaProductoId}`
+  );
+
   return response.data;
 }
+
+/*
+ * =========================================================
+ * ADMIN - BEBIDAS DISPONIBLES PARA UN EVENTO
+ * =========================================================
+ */
 
 export async function getCatalogoAdminParaEventoApi(params: {
   eventoId: number;
@@ -89,19 +115,23 @@ export async function getCatalogoAdminParaEventoApi(params: {
 
 export async function asignarBebidasMasivoEventoApi(
   eventoId: number,
-  items: {
-    bebidaProductoId: number;
-    precioEvento?: number | null;
-    disponible: boolean;
-  }[]
+  items: AsignarBebidaMasivoItemRequest[]
 ) {
   const response = await apiClient.post(
     `/api/admin/bebidas/eventos/${eventoId}/asignar-masivo`,
-    { items }
+    {
+      items,
+    }
   );
 
   return response.data;
 }
+
+/*
+ * =========================================================
+ * ADMIN - BEBIDAS YA ASIGNADAS AL EVENTO
+ * =========================================================
+ */
 
 export async function getBebidasEventoAdminApi(params: {
   eventoId: number;
@@ -125,11 +155,7 @@ export async function getBebidasEventoAdminApi(params: {
 
 export async function actualizarBebidaEventoApi(
   bebidaEventoId: number,
-  request: {
-    precioEvento?: number | null;
-    disponible: boolean;
-    activo: boolean;
-  }
+  request: ActualizarBebidaEventoRequest
 ): Promise<BebidaEventoAdmin> {
   const response = await apiClient.put(
     `/api/admin/bebidas/evento/${bebidaEventoId}`,
@@ -145,11 +171,19 @@ export async function cambiarDisponibilidadEventoApi(
 ) {
   const response = await apiClient.patch(
     `/api/admin/bebidas/evento/${bebidaEventoId}/disponibilidad`,
-    { disponible }
+    {
+      disponible,
+    }
   );
 
   return response.data;
 }
+
+/*
+ * =========================================================
+ * CLIENTE - CATÁLOGO DE BEBIDAS
+ * =========================================================
+ */
 
 export async function getCatalogoBebidasApi(params: {
   eventoId?: number | null;
@@ -157,34 +191,58 @@ export async function getCatalogoBebidasApi(params: {
   pageSize?: number;
   search?: string;
 }): Promise<PagedResponse<BebidaCatalogo>> {
-  const response = await apiClient.get("/api/bebidas/catalogo", {
-    params: {
-      eventoId: params.eventoId ?? undefined,
-      page: params.page ?? 1,
-      pageSize: params.pageSize ?? 20,
-      search: params.search ?? "",
-    },
-  });
+  const response = await apiClient.get(
+    "/api/bebidas/catalogo",
+    {
+      params: {
+        eventoId:
+          params.eventoId ?? undefined,
+
+        page:
+          params.page ?? 1,
+
+        pageSize:
+          params.pageSize ?? 20,
+
+        search:
+          params.search ?? "",
+      },
+    }
+  );
 
   return response.data;
 }
+
+/*
+ * =========================================================
+ * CLIENTE - ÓRDENES DE BEBIDAS
+ * =========================================================
+ */
 
 export async function crearOrdenBebidasApi(
   request: CrearBebidaOrdenRequest
 ): Promise<CrearBebidaOrdenPagoResponse> {
-  const response = await apiClient.post("/api/bebidas/ordenes", request);
+  const response = await apiClient.post(
+    "/api/bebidas/ordenes",
+    request
+  );
+
   return response.data;
 }
+
 export async function getMisOrdenesBebidasApi(params?: {
   page?: number;
   pageSize?: number;
 }): Promise<PagedResponse<BebidaOrden>> {
-  const response = await apiClient.get("/api/bebidas/mis-ordenes", {
-    params: {
-      page: params?.page ?? 1,
-      pageSize: params?.pageSize ?? 5,
-    },
-  });
+  const response = await apiClient.get(
+    "/api/bebidas/mis-ordenes",
+    {
+      params: {
+        page: params?.page ?? 1,
+        pageSize: params?.pageSize ?? 5,
+      },
+    }
+  );
 
   return response.data;
 }
@@ -192,25 +250,8 @@ export async function getMisOrdenesBebidasApi(params?: {
 export async function getMiOrdenBebidaDetalleApi(
   ordenId: number
 ): Promise<BebidaOrden> {
-  const response = await apiClient.get(`/api/bebidas/mis-ordenes/${ordenId}`);
-  return response.data;
-}
-
-export async function escanearOrdenBebidaBarraApi(
-  codigoQR: string
-): Promise<BebidaOrdenBarra> {
-  const response = await apiClient.post("/api/bebidas/barra/escanear", {
-    codigoQR,
-  });
-
-  return response.data;
-}
-
-export async function entregarOrdenBebidaBarraApi(
-  ordenId: number
-): Promise<BebidaOrden> {
-  const response = await apiClient.post(
-    `/api/bebidas/barra/ordenes/${ordenId}/entregar`
+  const response = await apiClient.get(
+    `/api/bebidas/mis-ordenes/${ordenId}`
   );
 
   return response.data;
@@ -226,11 +267,52 @@ export async function reintentarPagoBebidaOrdenApi(
   return response.data;
 }
 
-export async function registrarUsoDudosoBebidaScannerApi(data: {
-  codigoQR: string;
-  intentos: number;
-  motivo: string;
-}) {
-  const response = await apiClient.post("/api/barra/scanner/uso-dudoso", data);
+/*
+ * =========================================================
+ * BARRA
+ * =========================================================
+ */
+
+export async function escanearOrdenBebidaBarraApi(
+  codigoQR: string
+): Promise<BebidaOrdenBarra> {
+  const response = await apiClient.post(
+    "/api/bebidas/barra/escanear",
+    {
+      codigoQR,
+    }
+  );
+
+  return response.data;
+}
+
+export async function entregarOrdenBebidaBarraApi(
+  ordenId: number
+): Promise<BebidaOrden> {
+  const response = await apiClient.post(
+    `/api/bebidas/barra/ordenes/${ordenId}/entregar`
+  );
+
+  return response.data;
+}
+
+/*
+ * =========================================================
+ * SCANNER - SEGURIDAD
+ * =========================================================
+ */
+
+export async function registrarUsoDudosoBebidaScannerApi(
+  data: {
+    codigoQR: string;
+    intentos: number;
+    motivo: string;
+  }
+) {
+  const response = await apiClient.post(
+    "/api/barra/scanner/uso-dudoso",
+    data
+  );
+
   return response.data;
 }

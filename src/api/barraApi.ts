@@ -7,12 +7,42 @@ import {
   VentaBarra,
 } from "../types/barra";
 import { PagedResponse } from "../types/common";
+import {
+  VentaBarraPointCreada,
+  VentaPresencialEstadoPagoResponse,
+} from "../types/mercadoPagoPoint";
 import { apiClient } from "./apiClient";
 
 export async function crearVentaBarraApi(
   data: CrearVentaBarraRequest
-): Promise<VentaBarra> {
-  const response = await apiClient.post<VentaBarra>("/api/barra/ventas", data);
+): Promise<VentaBarraPointCreada> {
+  const response = await apiClient.post<VentaBarraPointCreada>(
+    "/api/barra/ventas",
+    data
+  );
+
+  return response.data;
+}
+
+export async function getEstadoPagoVentaBarraApi(
+  ventaId: number
+): Promise<VentaPresencialEstadoPagoResponse> {
+  const response =
+    await apiClient.get<VentaPresencialEstadoPagoResponse>(
+      `/api/barra/ventas/${ventaId}/estado-pago`
+    );
+
+  return response.data;
+}
+
+export async function cancelarPagoPointVentaBarraApi(
+  ventaId: number
+): Promise<VentaPresencialEstadoPagoResponse> {
+  const response =
+    await apiClient.post<VentaPresencialEstadoPagoResponse>(
+      `/api/barra/ventas/${ventaId}/cancelar-pago`
+    );
+
   return response.data;
 }
 
@@ -44,8 +74,6 @@ export async function getResumenCajaBarraApi(
 
   return response.data;
 }
-
-
 
 export async function getMisCajasBarraApi(params?: {
   page?: number;
@@ -79,7 +107,7 @@ export async function getVentasMiCajaBarraApi(params: {
   page?: number;
   pageSize?: number;
 }): Promise<PagedResponse<BarraCajaVenta>> {
-  const response = await apiClient.get(
+  const response = await apiClient.get<PagedResponse<BarraCajaVenta>>(
     `/api/barra/mis-cajas/${params.cajaId}/ventas`,
     {
       params: {
@@ -88,6 +116,40 @@ export async function getVentasMiCajaBarraApi(params: {
       },
     }
   );
+
+  return response.data;
+}
+
+
+export interface ProductoVentaResumen {
+  bebidaProductoId: number;
+  nombre: string;
+  cantidadVendida: number;
+}
+
+export interface AdminBarraVentasResumen {
+  ordenesCompletadas: number;
+  cantidadProductosVendidos: number;
+
+  productoMasVendido?: ProductoVentaResumen | null;
+  productoMenosVendido?: ProductoVentaResumen | null;
+
+  eventoId?: number | null;
+  eventoNombre?: string | null;
+}
+
+export async function getResumenVentasBarraAdminApi(
+  eventoId?: number | null
+): Promise<AdminBarraVentasResumen> {
+  const response =
+    await apiClient.get<AdminBarraVentasResumen>(
+      "/api/barra/barra/resumen-ventas",
+      {
+        params: eventoId
+          ? { eventoId }
+          : undefined,
+      }
+    );
 
   return response.data;
 }

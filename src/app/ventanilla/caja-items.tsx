@@ -47,13 +47,17 @@ export default function VentanillaCajaItemsScreen() {
       try {
         const id = Number(cajaId);
 
-        if (!id) {
+        if (!Number.isInteger(id) || id <= 0) {
           Alert.alert("Error", "Caja inválida.");
+          setItems([]);
           return;
         }
 
-        if (isRefreshing) setRefreshing(true);
-        else setLoading(true);
+        if (isRefreshing) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
 
         const result = await getVentasMiCajaVentanillaApi({
           cajaId: id,
@@ -67,7 +71,7 @@ export default function VentanillaCajaItemsScreen() {
       } catch (e: unknown) {
         Alert.alert(
           "Error",
-          getErrorMessage(e, "No se pudieron cargar ventas.")
+          getErrorMessage(e, "No se pudieron cargar las ventas.")
         );
       } finally {
         setLoading(false);
@@ -78,13 +82,20 @@ export default function VentanillaCajaItemsScreen() {
   );
 
   useEffect(() => {
-    loadFirstPage(false);
+    void loadFirstPage(false);
   }, [loadFirstPage]);
 
   async function loadMore() {
     const id = Number(cajaId);
 
-    if (!id || loadingMore || !hasNextPage) return;
+    if (
+      !Number.isInteger(id) ||
+      id <= 0 ||
+      loadingMore ||
+      !hasNextPage
+    ) {
+      return;
+    }
 
     try {
       setLoadingMore(true);
@@ -100,55 +111,132 @@ export default function VentanillaCajaItemsScreen() {
       setItems((prev) => [...prev, ...(result.items ?? [])]);
       setPage(nextPage);
       setHasNextPage(Boolean(result.hasNextPage));
+    } catch (e: unknown) {
+      Alert.alert(
+        "Error",
+        getErrorMessage(e, "No se pudieron cargar más ventas.")
+      );
     } finally {
       setLoadingMore(false);
     }
   }
 
   function renderItem({ item }: { item: VentaVentanilla }) {
+    const tieneDesglosePago =
+      (item.montoEfectivo ?? 0) > 0 ||
+      (item.montoMercadoPago ?? 0) > 0;
+
     return (
       <View style={styles.card}>
-        <Text style={styles.title}>Venta #{item.id}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.flexOne}>
+            <Text style={styles.title}>Venta #{item.id}</Text>
+
+            <Text style={styles.entryName}>
+              {item.tipoEntradaNombre ?? "Entrada física"}
+            </Text>
+
+            {item.tandaNombre ? (
+              <Text style={styles.muted}>Tanda: {item.tandaNombre}</Text>
+            ) : null}
+          </View>
+
+          <View style={styles.statusBadge}>
+            <Text style={styles.statusBadgeText}>{item.estado}</Text>
+          </View>
+        </View>
+
         <Text style={styles.muted}>Pago: {item.metodoPago}</Text>
-        <Text style={styles.muted}>Entrega: {item.tipoEntrega}</Text>
-        <Text style={styles.muted}>Fecha: {formatDate(item.fechaCreacion)}</Text>
+
+        <Text style={styles.muted}>
+          Fecha: {formatDate(item.fechaCreacion)}
+        </Text>
 
         <View style={styles.amountBox}>
-          <MoneyRow label="Entrada" value={item.subtotal ?? 0} />
+          <MoneyRow
+            label="Subtotal entrada"
+            value={item.subtotal ?? 0}
+          />
 
           {(item.cargoServicioMonto ?? 0) > 0 ? (
             <MoneyRow
-              label={item.cargoServicioDescripcion ?? "Cargo servicio"}
+              label={
+                item.cargoServicioDescripcion ?? "Cargo por servicio"
+              }
               value={item.cargoServicioMonto ?? 0}
             />
           ) : null}
 
           <View style={styles.separator} />
+
           <MoneyRow label="Total" value={item.total} strong />
+
+          {tieneDesglosePago ? (
+            <>
+              <View style={styles.separator} />
+
+              {(item.montoEfectivo ?? 0) > 0 ? (
+                <MoneyRow
+                  label="Efectivo"
+                  value={item.montoEfectivo ?? 0}
+                />
+              ) : null}
+
+              {(item.montoMercadoPago ?? 0) > 0 ? (
+                <MoneyRow
+                  label="Mercado Pago"
+                  value={item.montoMercadoPago ?? 0}
+                />
+              ) : null}
+            </>
+          ) : null}
         </View>
 
-        {item.numeroTicket ? (
-          <Text style={styles.ticket}>Ticket: #{item.numeroTicket}</Text>
-        ) : (
-          <Text style={styles.ticket}>Ticket físico</Text>
-        )}
+        <View style={styles.ticketBox}>
+          <Text style={styles.ticketTitle}>Ticket físico</Text>
 
-        {item.nombreCliente ? (
-          <Text style={styles.muted}>Cliente: {item.nombreCliente}</Text>
+          <Text style={styles.ticketText}>
+            {item.ticketImpreso
+              ? "Impresión confirmada"
+              : "Sin impresión confirmada"}
+          </Text>
+
+          {typeof item.cantidadImpresiones === "number" ? (
+            <Text style={styles.ticketMeta}>
+              Impresiones: {item.cantidadImpresiones}
+            </Text>
+          ) : null}
+
+          {item.errorUltimaImpresion ? (
+            <Text style={styles.ticketError}>
+              {item.errorUltimaImpresion}
+            </Text>
+          ) : null}
+        </View>
+
+        {item.mercadoPagoStatus ? (
+          <Text style={styles.muted}>
+            Mercado Pago: {item.mercadoPagoStatus}
+          </Text>
         ) : null}
 
-        {item.emailCliente ? (
-          <Text style={styles.muted}>{item.emailCliente}</Text>
+        {item.observacion ? (
+          <Text style={styles.muted}>
+            Observación: {item.observacion}
+          </Text>
         ) : null}
       </View>
     );
   }
 
   return (
-    <RoleGuard allowedRoles={["Ventanilla"]}>
-      <AppLayout title="Items caja" scroll={false}>
+    <RoleGuard allowedRoles={["Ventanilla", "Admin", "SuperAdmin"]}>
+      <AppLayout title="Ventas de caja" scroll={false}>
         {loading ? (
-          <ActivityIndicator color="#E50914" style={{ marginTop: 60 }} />
+          <ActivityIndicator
+            color="#E50914"
+            style={{ marginTop: 60 }}
+          />
         ) : (
           <FlatList
             data={items}
@@ -157,21 +245,26 @@ export default function VentanillaCajaItemsScreen() {
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={() => loadFirstPage(true)}
+                onRefresh={() => void loadFirstPage(true)}
                 tintColor="#E50914"
                 colors={["#E50914"]}
               />
             }
-            onEndReached={loadMore}
+            onEndReached={() => void loadMore()}
             onEndReachedThreshold={0.4}
             ListFooterComponent={
               loadingMore ? (
-                <ActivityIndicator color="#E50914" style={{ marginVertical: 20 }} />
+                <ActivityIndicator
+                  color="#E50914"
+                  style={{ marginVertical: 20 }}
+                />
               ) : null
             }
             ListEmptyComponent={
               <View style={styles.card}>
-                <Text style={styles.muted}>No hay ventas registradas.</Text>
+                <Text style={styles.muted}>
+                  No hay ventas registradas.
+                </Text>
               </View>
             }
             contentContainerStyle={{ paddingBottom: 24 }}
@@ -196,6 +289,7 @@ function MoneyRow({
       <Text style={strong ? styles.moneyLabelStrong : styles.moneyLabel}>
         {label}
       </Text>
+
       <Text style={strong ? styles.moneyValueStrong : styles.moneyValue}>
         {formatMoney(value)}
       </Text>
@@ -204,6 +298,9 @@ function MoneyRow({
 }
 
 const styles = StyleSheet.create({
+  flexOne: {
+    flex: 1,
+  },
   card: {
     backgroundColor: "rgba(255,255,255,0.07)",
     borderRadius: 22,
@@ -212,8 +309,40 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.10)",
     marginBottom: 14,
   },
-  title: { color: "#FFFFFF", fontSize: 19, fontWeight: "900" },
-  muted: { color: "#BDBDBD", marginTop: 6 },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  title: {
+    color: "#FFFFFF",
+    fontSize: 19,
+    fontWeight: "900",
+  },
+  entryName: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 5,
+  },
+  muted: {
+    color: "#BDBDBD",
+    marginTop: 6,
+  },
+  statusBadge: {
+    backgroundColor: "rgba(32,214,123,0.14)",
+    borderColor: "rgba(32,214,123,0.30)",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  statusBadgeText: {
+    color: "#20D67B",
+    fontSize: 11,
+    fontWeight: "900",
+  },
   amountBox: {
     backgroundColor: "rgba(0,0,0,0.22)",
     borderRadius: 16,
@@ -226,8 +355,14 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8,
   },
-  moneyLabel: { color: "#BDBDBD", flex: 1 },
-  moneyValue: { color: "#FFFFFF", fontWeight: "900" },
+  moneyLabel: {
+    color: "#BDBDBD",
+    flex: 1,
+  },
+  moneyValue: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+  },
   moneyLabelStrong: {
     color: "#FFFFFF",
     flex: 1,
@@ -244,9 +379,33 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.12)",
     marginVertical: 8,
   },
-  ticket: {
+  ticketBox: {
+    backgroundColor: "rgba(255,209,102,0.08)",
+    borderColor: "rgba(255,209,102,0.24)",
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 12,
+  },
+  ticketTitle: {
     color: "#FFD166",
-    marginTop: 10,
+    fontSize: 14,
     fontWeight: "900",
+  },
+  ticketText: {
+    color: "#FFFFFF",
+    marginTop: 4,
+    fontWeight: "700",
+  },
+  ticketMeta: {
+    color: "#BDBDBD",
+    marginTop: 4,
+    fontSize: 12,
+  },
+  ticketError: {
+    color: "#FF8A8A",
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 17,
   },
 });

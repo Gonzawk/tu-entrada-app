@@ -15,18 +15,36 @@ import {
 import { AppLayout } from "../../components/shared/AppLayout";
 import { RoleGuard } from "../../components/shared/RoleGuard";
 import { Caja } from "../../types/cajas";
-import { VentaVentanilla, VentanillaResumenCaja } from "../../types/ventanilla";
+import {
+  VentaVentanilla,
+  VentanillaResumenCaja,
+} from "../../types/ventanilla";
 import { formatDate } from "../../utils/formatDate";
 import { formatMoney } from "../../utils/formatMoney";
 
 const PAGE_SIZE = 5;
+
+type ApiErrorLike = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const err = error as ApiErrorLike;
+  return err?.response?.data?.message ?? fallback;
+}
 
 export default function VentanillaSalesScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [caja, setCaja] = useState<Caja | null>(null);
-  const [resumen, setResumen] = useState<VentanillaResumenCaja | null>(null);
+  const [resumen, setResumen] =
+    useState<VentanillaResumenCaja | null>(null);
+
   const [ventas, setVentas] = useState<VentaVentanilla[]>([]);
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -34,16 +52,19 @@ export default function VentanillaSalesScreen() {
   const montoInicial = resumen?.montoInicial ?? 0;
   const ventasEfectivo = resumen?.totalEfectivo ?? 0;
   const ventasTransferencia = resumen?.totalTransferencia ?? 0;
+  const ventasMercadoPago = resumen?.totalMercadoPago ?? 0;
   const ventasTotal = resumen?.totalGeneral ?? 0;
 
   const totalEfectivoARendir =
-    resumen?.totalEfectivoARendir ?? montoInicial + ventasEfectivo;
+    resumen?.totalEfectivoARendir ??
+    montoInicial + ventasEfectivo;
 
   const totalGeneralARendir =
-    resumen?.totalGeneralARendir ?? montoInicial + ventasTotal;
+    resumen?.totalGeneralARendir ??
+    montoInicial + ventasTotal;
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   async function load() {
@@ -56,6 +77,8 @@ export default function VentanillaSalesScreen() {
         setCaja(null);
         setResumen(null);
         setVentas([]);
+        setPage(1);
+        setHasNextPage(false);
         return;
       }
 
@@ -74,10 +97,10 @@ export default function VentanillaSalesScreen() {
       setVentas(ventasData.items ?? []);
       setPage(1);
       setHasNextPage(Boolean(ventasData.hasNextPage));
-    } catch (e: any) {
+    } catch (e: unknown) {
       Alert.alert(
         "Error",
-        String(e?.response?.data?.message ?? "No se pudo cargar resumen.")
+        getErrorMessage(e, "No se pudo cargar el resumen.")
       );
     } finally {
       setLoading(false);
@@ -101,10 +124,10 @@ export default function VentanillaSalesScreen() {
       setVentas((prev) => [...prev, ...(result.items ?? [])]);
       setPage(nextPage);
       setHasNextPage(Boolean(result.hasNextPage));
-    } catch (e: any) {
+    } catch (e: unknown) {
       Alert.alert(
         "Error",
-        String(e?.response?.data?.message ?? "No se pudieron cargar más ventas.")
+        getErrorMessage(e, "No se pudieron cargar más ventas.")
       );
     } finally {
       setLoadingMore(false);
@@ -113,20 +136,28 @@ export default function VentanillaSalesScreen() {
 
   if (loading) {
     return (
-      <RoleGuard allowedRoles={["Ventanilla", "Admin", "SuperAdmin"]}>
+      <RoleGuard
+        allowedRoles={["Ventanilla", "Admin", "SuperAdmin"]}
+      >
         <AppLayout title="Resumen ventas">
-          <ActivityIndicator color="#E50914" style={{ marginTop: 60 }} />
+          <ActivityIndicator
+            color="#E50914"
+            style={{ marginTop: 60 }}
+          />
         </AppLayout>
       </RoleGuard>
     );
   }
 
   return (
-    <RoleGuard allowedRoles={["Ventanilla", "Admin", "SuperAdmin"]}>
+    <RoleGuard
+      allowedRoles={["Ventanilla", "Admin", "SuperAdmin"]}
+    >
       <AppLayout title="Resumen ventas">
         {!caja ? (
           <View style={styles.card}>
             <Text style={styles.title}>No hay caja abierta</Text>
+
             <Text style={styles.muted}>
               Abrí una caja de ventanilla para ver ventas.
             </Text>
@@ -135,21 +166,38 @@ export default function VentanillaSalesScreen() {
           <>
             <View style={styles.card}>
               <Text style={styles.title}>Caja #{caja.id}</Text>
+
               <Text style={styles.muted}>
                 Evento: {caja.eventoNombre ?? "Sin evento"}
               </Text>
-              <Text style={styles.muted}>Estado: {resumen?.estado}</Text>
+
+              <Text style={styles.muted}>
+                Estado: {resumen?.estado ?? caja.estado}
+              </Text>
 
               <Text style={styles.total}>
                 Total a rendir: {formatMoney(totalGeneralARendir)}
               </Text>
 
               <View style={styles.summaryBox}>
-                <MoneyRow label="Fondo inicial efectivo" value={montoInicial} />
-                <MoneyRow label="Ventas en efectivo" value={ventasEfectivo} />
+                <MoneyRow
+                  label="Fondo inicial efectivo"
+                  value={montoInicial}
+                />
+
+                <MoneyRow
+                  label="Ventas en efectivo"
+                  value={ventasEfectivo}
+                />
+
                 <MoneyRow
                   label="Ventas por transferencia"
                   value={ventasTransferencia}
+                />
+
+                <MoneyRow
+                  label="Ventas Mercado Pago"
+                  value={ventasMercadoPago}
                 />
 
                 <View style={styles.separator} />
@@ -159,7 +207,12 @@ export default function VentanillaSalesScreen() {
                   value={totalEfectivoARendir}
                   strong
                 />
-                <MoneyRow label="Total ventas" value={ventasTotal} />
+
+                <MoneyRow
+                  label="Total ventas"
+                  value={ventasTotal}
+                />
+
                 <MoneyRow
                   label="Total general a rendir"
                   value={totalGeneralARendir}
@@ -169,76 +222,163 @@ export default function VentanillaSalesScreen() {
                 <View style={styles.separator} />
 
                 <Text style={styles.muted}>
-                  Ventas: {resumen?.cantidadVentas ?? 0}
+                  Ventas realizadas: {resumen?.cantidadVentas ?? 0}
                 </Text>
-                <Text style={styles.muted}>
-                  Digitales: {resumen?.ticketsDigitalesGenerados ?? 0}
-                </Text>
-                <Text style={styles.muted}>
-                  Físicos: {resumen?.ticketsFisicosVendidos ?? 0}
+
+                <Text style={styles.helpText}>
+                  Todas las ventas de Ventanilla corresponden a entradas
+                  físicas. El estado de impresión se muestra individualmente
+                  en cada venta.
                 </Text>
               </View>
             </View>
 
             <View style={styles.card}>
               <Text style={styles.title}>Últimas ventas</Text>
+
               <Text style={styles.muted}>
-                Se muestran las últimas {PAGE_SIZE}. Podés cargar más si lo necesitás.
+                Se muestran las últimas {PAGE_SIZE}. Podés cargar más si lo
+                necesitás.
               </Text>
 
               {ventas.length === 0 ? (
-                <Text style={styles.muted}>Todavía no hay ventas.</Text>
+                <Text style={styles.muted}>
+                  Todavía no hay ventas.
+                </Text>
               ) : (
-                ventas.map((venta) => (
-                  <View key={venta.id} style={styles.saleCard}>
-                    <Text style={styles.saleTitle}>Venta #{venta.id}</Text>
-                    <Text style={styles.muted}>Pago: {venta.metodoPago}</Text>
-                    <Text style={styles.muted}>Entrega: {venta.tipoEntrega}</Text>
-                    <Text style={styles.muted}>
-                      Fecha: {formatDate(venta.fechaCreacion)}
-                    </Text>
+                ventas.map((venta) => {
+                  const tieneDesglosePago =
+                    (venta.montoEfectivo ?? 0) > 0 ||
+                    (venta.montoMercadoPago ?? 0) > 0;
 
-                    <View style={styles.amountBox}>
-                      <MoneyRow label="Entrada" value={venta.subtotal ?? 0} />
+                  return (
+                    <View key={venta.id} style={styles.saleCard}>
+                      <View style={styles.saleHeader}>
+                        <View style={styles.flexOne}>
+                          <Text style={styles.saleTitle}>
+                            Venta #{venta.id}
+                          </Text>
 
-                      {(venta.cargoServicioMonto ?? 0) > 0 ? (
-                        <MoneyRow
-                          label={
-                            venta.cargoServicioDescripcion ?? "Cargo servicio"
-                          }
-                          value={venta.cargoServicioMonto ?? 0}
-                        />
+                          <Text style={styles.entryName}>
+                            {venta.tipoEntradaNombre ??
+                              "Entrada física"}
+                          </Text>
+                        </View>
+
+                        <View style={styles.statusBadge}>
+                          <Text style={styles.statusBadgeText}>
+                            {venta.estado}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {venta.tandaNombre ? (
+                        <Text style={styles.muted}>
+                          Tanda: {venta.tandaNombre}
+                        </Text>
                       ) : null}
 
-                      <View style={styles.separator} />
-
-                      <MoneyRow label="Total" value={venta.total} strong />
-                    </View>
-
-                    {venta.numeroTicket ? (
-                      <Text style={styles.itemText}>
-                        Ticket: {venta.numeroTicket}
+                      <Text style={styles.muted}>
+                        Pago: {venta.metodoPago}
                       </Text>
-                    ) : (
-                      <Text style={styles.itemText}>Ticket físico / caja</Text>
-                    )}
 
-                    {venta.emailCliente ? (
-                      <Text style={styles.itemText}>{venta.emailCliente}</Text>
-                    ) : null}
-                  </View>
-                ))
+                      <Text style={styles.muted}>
+                        Fecha: {formatDate(venta.fechaCreacion)}
+                      </Text>
+
+                      <View style={styles.amountBox}>
+                        <MoneyRow
+                          label="Subtotal entrada"
+                          value={venta.subtotal ?? 0}
+                        />
+
+                        {(venta.cargoServicioMonto ?? 0) > 0 ? (
+                          <MoneyRow
+                            label={
+                              venta.cargoServicioDescripcion ??
+                              "Cargo por servicio"
+                            }
+                            value={venta.cargoServicioMonto ?? 0}
+                          />
+                        ) : null}
+
+                        <View style={styles.separator} />
+
+                        <MoneyRow
+                          label="Total"
+                          value={venta.total}
+                          strong
+                        />
+
+                        {tieneDesglosePago ? (
+                          <>
+                            <View style={styles.separator} />
+
+                            {(venta.montoEfectivo ?? 0) > 0 ? (
+                              <MoneyRow
+                                label="Efectivo"
+                                value={venta.montoEfectivo ?? 0}
+                              />
+                            ) : null}
+
+                            {(venta.montoMercadoPago ?? 0) > 0 ? (
+                              <MoneyRow
+                                label="Mercado Pago"
+                                value={
+                                  venta.montoMercadoPago ?? 0
+                                }
+                              />
+                            ) : null}
+                          </>
+                        ) : null}
+                      </View>
+
+                      <View style={styles.ticketBox}>
+                        <Text style={styles.ticketTitle}>
+                          Ticket físico
+                        </Text>
+
+                        <Text style={styles.itemText}>
+                          {venta.ticketImpreso
+                            ? "Impresión confirmada"
+                            : "Sin impresión confirmada"}
+                        </Text>
+
+                        {typeof venta.cantidadImpresiones ===
+                        "number" ? (
+                          <Text style={styles.itemText}>
+                            Impresiones:{" "}
+                            {venta.cantidadImpresiones}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      {venta.mercadoPagoStatus ? (
+                        <Text style={styles.itemText}>
+                          Mercado Pago: {venta.mercadoPagoStatus}
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })
               )}
 
               {hasNextPage ? (
                 <Pressable
-                  style={styles.secondaryButton}
-                  onPress={loadMore}
+                  style={({ pressed }) => [
+                    styles.secondaryButton,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => void loadMore()}
                   disabled={loadingMore}
                 >
-                  <Text style={styles.buttonText}>
-                    {loadingMore ? "Cargando..." : "Cargar más"}
-                  </Text>
+                  {loadingMore ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.buttonText}>
+                      Cargar más
+                    </Text>
+                  )}
                 </Pressable>
               ) : null}
             </View>
@@ -263,6 +403,7 @@ function MoneyRow({
       <Text style={strong ? styles.rowLabelStrong : styles.rowLabel}>
         {label}
       </Text>
+
       <Text style={strong ? styles.rowValueStrong : styles.rowValue}>
         {formatMoney(value)}
       </Text>
@@ -271,6 +412,9 @@ function MoneyRow({
 }
 
 const styles = StyleSheet.create({
+  flexOne: {
+    flex: 1,
+  },
   card: {
     backgroundColor: "rgba(255,255,255,0.07)",
     padding: 16,
@@ -279,8 +423,15 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.10)",
     marginBottom: 14,
   },
-  title: { color: "#FFFFFF", fontSize: 21, fontWeight: "900" },
-  muted: { color: "#BDBDBD", marginTop: 6 },
+  title: {
+    color: "#FFFFFF",
+    fontSize: 21,
+    fontWeight: "900",
+  },
+  muted: {
+    color: "#BDBDBD",
+    marginTop: 6,
+  },
   total: {
     color: "#20D67B",
     fontSize: 25,
@@ -296,12 +447,37 @@ const styles = StyleSheet.create({
   saleCard: {
     borderTopWidth: 1,
     borderTopColor: "rgba(255,255,255,0.10)",
-    paddingTop: 12,
-    marginTop: 12,
+    paddingTop: 14,
+    marginTop: 14,
+  },
+  saleHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
   },
   saleTitle: {
     color: "#FFFFFF",
     fontSize: 17,
+    fontWeight: "900",
+  },
+  entryName: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  statusBadge: {
+    backgroundColor: "rgba(32,214,123,0.14)",
+    borderColor: "rgba(32,214,123,0.30)",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  statusBadgeText: {
+    color: "#20D67B",
+    fontSize: 11,
     fontWeight: "900",
   },
   amountBox: {
@@ -340,6 +516,25 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.12)",
     marginVertical: 8,
   },
+  helpText: {
+    color: "#9B9B9B",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  ticketBox: {
+    backgroundColor: "rgba(255,209,102,0.08)",
+    borderColor: "rgba(255,209,102,0.24)",
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 10,
+    marginTop: 10,
+  },
+  ticketTitle: {
+    color: "#FFD166",
+    fontSize: 13,
+    fontWeight: "900",
+  },
   itemText: {
     color: "#BDBDBD",
     marginTop: 5,
@@ -349,10 +544,15 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 16,
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
     marginTop: 14,
   },
   buttonText: {
     color: "#FFFFFF",
     fontWeight: "900",
+  },
+  pressed: {
+    opacity: 0.82,
   },
 });

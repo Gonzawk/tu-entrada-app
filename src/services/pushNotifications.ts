@@ -109,26 +109,34 @@ export async function registerForPushNotificationsAsync({
     );
   }
 
-  const cacheValue =
-    `${usuarioId}|${rolActivo}|${expoPushToken}`;
+ const cacheValue =
+  `${usuarioId}|${rolActivo}|${expoPushToken}`;
 
-  const lastCacheValue =
-    await SecureStore.getItemAsync(
-      PUSH_CACHE_KEY
-    );
-
-  if (lastCacheValue === cacheValue) {
-    return expoPushToken;
+/*
+ * Siempre sincronizamos el token con la API.
+ *
+ * El backend debe implementar este endpoint
+ * como upsert/idempotente.
+ *
+ * De esta forma:
+ * - reactiva tokens;
+ * - actualiza RolActivo;
+ * - actualiza UltimoUso;
+ * - recupera registros desincronizados.
+ */
+await apiClient.post(
+  "/api/notificaciones/push-token",
+  {
+    token: expoPushToken,
+    plataforma: Platform.OS,
+    rolActivo: rolActivo.trim(),
   }
+);
 
-  await apiClient.post(
-    "/api/notificaciones/push-token",
-    {
-      token: expoPushToken,
-      plataforma: Platform.OS,
-      rolActivo: rolActivo.trim(),
-    }
-  );
+await SecureStore.setItemAsync(
+  PUSH_CACHE_KEY,
+  cacheValue
+);
 
   await SecureStore.setItemAsync(
     PUSH_CACHE_KEY,

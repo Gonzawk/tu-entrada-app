@@ -2,30 +2,30 @@ import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import {
-    actualizarTandaAdminApi,
-    actualizarTipoEntradaAdminApi,
-    cambiarEstadoTandaAdminApi,
-    crearTandaAdminApi,
-    crearTipoEntradaAdminApi,
-    eliminarTipoEntradaAdminApi,
-    subirImagenAdminApi,
+  actualizarTandaAdminApi,
+  actualizarTipoEntradaAdminApi,
+  cambiarEstadoTandaAdminApi,
+  crearTandaAdminApi,
+  crearTipoEntradaAdminApi,
+  eliminarTipoEntradaAdminApi,
+  subirImagenAdminApi,
 } from "../../../api/adminApi";
 import { getBebidasAdminApi } from "../../../api/drinksApi";
 import {
-    getEventoDetalleAdminApi,
-    getTiposEntradaPorEventoAdminApi,
+  getEventoDetalleAdminApi,
+  getTiposEntradaPorEventoAdminApi,
 } from "../../../api/eventsApi";
 import { AppLayout } from "../../../components/shared/AppLayout";
 import { RoleGuard } from "../../../components/shared/RoleGuard";
@@ -73,6 +73,7 @@ type TandaForm = {
   nombre: string;
   precio: string;
   cantidadTotal: string;
+  habilitadaVentaFisica: boolean;
   inicioDia: string;
   inicioHora: string;
   finDia: string;
@@ -100,6 +101,7 @@ const TANDA_VACIA: TandaForm = {
   nombre: "Primera tanda",
   precio: "5000",
   cantidadTotal: "50",
+  habilitadaVentaFisica: false,
   inicioDia: "",
   inicioHora: "",
   finDia: "",
@@ -616,6 +618,7 @@ export default function AdminEventTicketTypesScreen() {
       nombre: tanda.nombre ?? "",
       precio: String(tanda.precio ?? 0),
       cantidadTotal: String(tanda.cantidadTotal ?? 0),
+      habilitadaVentaFisica: Boolean(tanda.habilitadaVentaFisica),
       inicioDia: inicio.date,
       inicioHora: inicio.time,
       finDia: fin.date,
@@ -683,6 +686,7 @@ export default function AdminEventTicketTypesScreen() {
       cantidadTotal,
       fechaInicio,
       fechaFin,
+      habilitadaVentaFisica: tandaForm.habilitadaVentaFisica,
     };
 
     try {
@@ -975,6 +979,18 @@ export default function AdminEventTicketTypesScreen() {
                               </Text>
                               <Text style={styles.muted}>
                                 Reservadas: {tanda.cantidadReservada}
+                              </Text>
+                              <Text
+                                style={
+                                  tanda.habilitadaVentaFisica
+                                    ? styles.green
+                                    : styles.muted
+                                }
+                              >
+                                Canal de venta:{" "}
+                                {tanda.habilitadaVentaFisica
+                                  ? "Ventanilla física"
+                                  : "Catálogo online"}
                               </Text>
                               <Text style={styles.muted}>
                                 Desde:{" "}
@@ -1410,6 +1426,28 @@ export default function AdminEventTicketTypesScreen() {
                   onChange={(v) => patchTanda("cantidadTotal", v)}
                   numeric
                 />
+
+                <Toggle
+                  label={
+                    tandaForm.habilitadaVentaFisica
+                      ? "Venta en ventanilla: habilitada"
+                      : "Venta en ventanilla: deshabilitada"
+                  }
+                  active={tandaForm.habilitadaVentaFisica}
+                  onPress={() =>
+                    patchTanda(
+                      "habilitadaVentaFisica",
+                      !tandaForm.habilitadaVentaFisica,
+                    )
+                  }
+                />
+
+                <Text style={styles.muted}>
+                  {tandaForm.habilitadaVentaFisica
+                    ? "Esta tanda se ofrecerá en Ventanilla física y quedará fuera del catálogo online."
+                    : "Esta tanda se ofrecerá en el catálogo online y no aparecerá en Ventanilla física."}
+                </Text>
+
                 <Field
                   label="Fecha inicio (YYYY-MM-DD)"
                   value={tandaForm.inicioDia}

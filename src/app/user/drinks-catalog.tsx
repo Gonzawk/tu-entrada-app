@@ -1,12 +1,13 @@
 import { createIdempotencyKey } from "@/utils/idempotency";
 import { router, useLocalSearchParams } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  InteractionManager,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -25,6 +26,16 @@ import { BebidaCarritoItem, BebidaCatalogo } from "../../types/drinks";
 import { formatMoney } from "../../utils/formatMoney";
 
 const PAGE_SIZE = 20;
+
+async function abrirCheckoutPago(checkoutUrl: string): Promise<void> {
+  const url = checkoutUrl.trim();
+
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error("La URL de pago recibida no es válida.");
+  }
+
+  await Linking.openURL(url);
+}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (!error || typeof error !== "object") {
@@ -298,20 +309,30 @@ export default function UserDrinksCatalogScreen() {
     [carritoItems],
   );
 
+  async function esperarFinDeInteracciones() {
+    await new Promise<void>((resolve) => {
+      InteractionManager.runAfterInteractions(() => {
+        resolve();
+      });
+    });
+  }
+
   async function confirmarOrden() {
     if (!eventoId) {
       Alert.alert(
         "Compra no disponible",
-        "Podés consultar el catálogo general, pero las compras de bebidas estarán habilitadas cuando exista un evento publicado en curso o próximo.",
+        "Podés consultar el catálogo general, pero las compras de bebidas estarán habilitadas cuando exista un evento publicado en curso o próximo."
       );
+
       return;
     }
 
     if (carritoItems.length === 0) {
       Alert.alert(
         "Carrito vacío",
-        "Agregá al menos una bebida.",
+        "Agregá al menos una bebida."
       );
+
       return;
     }
 
@@ -319,37 +340,86 @@ export default function UserDrinksCatalogScreen() {
       return;
     }
 
+    let ordenCreadaId: number | null = null;
+
     try {
       setCreatingOrder(true);
 
-      const ordenPago = await crearOrdenBebidasApi({
-        eventoId,
-        idempotencyKey: bebidaOrderKey,
-        items: carritoItems.map((item) => ({
-          bebidaProductoId: item.bebidaProductoId,
-          cantidad: item.cantidad,
-        })),
-      });
+      const ordenPago =
+        await crearOrdenBebidasApi({
+          eventoId,
+          idempotencyKey: bebidaOrderKey,
+          items: carritoItems.map((item) => ({
+            bebidaProductoId: item.bebidaProductoId,
+            cantidad: item.cantidad,
+          })),
+        });
+
+      ordenCreadaId = ordenPago.ordenId;
 
       const checkoutUrl =
         ordenPago.checkoutUrl ??
         ordenPago.sandboxCheckoutUrl;
 
       if (!checkoutUrl) {
-        Alert.alert(
-          "Error",
-          "No se recibió la URL de pago.",
+        setCarrito({});
+        setCartOpen(false);
+        setBebidaOrderKey(
+          createIdempotencyKey("bebida-online")
         );
+
+        Alert.alert(
+          "Orden creada",
+          "La orden fue creada correctamente, pero no se recibió la URL de pago. Podés continuar desde Mis órdenes."
+        );
+
+        router.push({
+          pathname: "/user/drink-order-detail",
+          params: {
+            ordenId: String(ordenPago.ordenId),
+          },
+        } as never);
+
         return;
       }
 
+      /*
+       * La orden ya existe en backend.
+       * En iOS cerramos primero el Modal y esperamos
+       * a que termine su animación antes de presentar
+       * SFSafariViewController mediante expo-web-browser.
+       */
       setCarrito({});
       setCartOpen(false);
       setBebidaOrderKey(
-        createIdempotencyKey("bebida-online"),
+        createIdempotencyKey("bebida-online")
       );
 
-      await WebBrowser.openBrowserAsync(checkoutUrl);
+      await esperarFinDeInteracciones();
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          resolve();
+        });
+      });
+
+      try {
+        await abrirCheckoutPago(checkoutUrl);
+
+        if (__DEV__) {
+          console.log("Checkout de Mercado Pago abierto en navegador externo.");
+        }
+      } catch (browserError) {
+        console.log(
+          "ERROR ABRIENDO MERCADO PAGO:",
+          browserError
+        );
+
+        Alert.alert(
+          "Orden creada",
+          "Tu orden fue creada correctamente, pero no pudimos abrir Mercado Pago. Podés continuar el pago desde Mis órdenes."
+        );
+      }
 
       router.push({
         pathname: "/user/drink-order-detail",
@@ -358,12 +428,33 @@ export default function UserDrinksCatalogScreen() {
         },
       } as never);
     } catch (error: unknown) {
+      console.log(
+        "ERROR CREANDO ORDEN BEBIDA:",
+        error
+      );
+
+      if (ordenCreadaId) {
+        Alert.alert(
+          "Orden creada",
+          "La orden fue creada, pero ocurrió un problema al continuar con el pago. Revisala desde Mis órdenes."
+        );
+
+        router.push({
+          pathname: "/user/drink-order-detail",
+          params: {
+            ordenId: String(ordenCreadaId),
+          },
+        } as never);
+
+        return;
+      }
+
       Alert.alert(
         "Error",
         getErrorMessage(
           error,
-          "No se pudo crear la orden.",
-        ),
+          "No se pudo crear la orden."
+        )
       );
     } finally {
       setCreatingOrder(false);

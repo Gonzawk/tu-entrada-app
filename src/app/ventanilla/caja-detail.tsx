@@ -40,8 +40,9 @@ export default function VentanillaCajaDetailScreen() {
 
       const id = Number(cajaId);
 
-      if (!id) {
+      if (!Number.isInteger(id) || id <= 0) {
         Alert.alert("Error", "Caja inválida.");
+        setDetalle(null);
         return;
       }
 
@@ -50,7 +51,7 @@ export default function VentanillaCajaDetailScreen() {
     } catch (e: unknown) {
       Alert.alert(
         "Error",
-        getErrorMessage(e, "No se pudo cargar detalle.")
+        getErrorMessage(e, "No se pudo cargar el detalle de la caja.")
       );
     } finally {
       setLoading(false);
@@ -58,7 +59,7 @@ export default function VentanillaCajaDetailScreen() {
   }, [cajaId]);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
   function goToItems() {
@@ -72,7 +73,7 @@ export default function VentanillaCajaDetailScreen() {
 
   if (loading) {
     return (
-      <RoleGuard allowedRoles={["Ventanilla"]}>
+      <RoleGuard allowedRoles={["Ventanilla", "Admin", "SuperAdmin"]}>
         <AppLayout title="Detalle caja">
           <ActivityIndicator color="#E50914" style={{ marginTop: 60 }} />
         </AppLayout>
@@ -82,38 +83,91 @@ export default function VentanillaCajaDetailScreen() {
 
   if (!detalle) {
     return (
-      <RoleGuard allowedRoles={["Ventanilla"]}>
+      <RoleGuard allowedRoles={["Ventanilla", "Admin", "SuperAdmin"]}>
         <AppLayout title="Detalle caja">
-          <Text style={styles.muted}>No hay datos disponibles.</Text>
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Sin información</Text>
+            <Text style={styles.muted}>
+              No hay datos disponibles para esta caja.
+            </Text>
+          </View>
         </AppLayout>
       </RoleGuard>
     );
   }
 
   const ventasEfectivo = detalle.totalEfectivo ?? 0;
+  const ventasTransferencia = detalle.totalTransferencia ?? 0;
+  const ventasMercadoPago = detalle.totalMercadoPago ?? 0;
+
   const totalEfectivoARendir =
-    detalle.totalEfectivoARendir ?? detalle.montoInicial + ventasEfectivo;
+    detalle.totalEfectivoARendir ??
+    detalle.montoInicial + ventasEfectivo;
+
   const totalGeneralARendir =
-    detalle.totalGeneralARendir ?? detalle.montoInicial + detalle.totalGeneral;
+    detalle.totalGeneralARendir ??
+    detalle.montoInicial + detalle.totalGeneral;
 
   return (
-    <RoleGuard allowedRoles={["Ventanilla"]}>
+    <RoleGuard allowedRoles={["Ventanilla", "Admin", "SuperAdmin"]}>
       <AppLayout title="Detalle caja">
         <View style={styles.hero}>
           <Text style={styles.heroTitle}>Caja #{detalle.id}</Text>
-          <Text style={styles.muted}>{detalle.eventoNombre ?? "Sin evento"}</Text>
-          <Text style={styles.heroTotal}>{formatMoney(totalGeneralARendir)}</Text>
+
+          <Text style={styles.muted}>
+            {detalle.eventoNombre ?? "Sin evento"}
+          </Text>
+
+          <Text style={styles.heroTotal}>
+            {formatMoney(totalGeneralARendir)}
+          </Text>
+
           <Text style={styles.muted}>Estado: {detalle.estado}</Text>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Rendición</Text>
 
-          <MoneyRow label="Fondo inicial efectivo" value={detalle.montoInicial} />
-          <MoneyRow label="Ventas efectivo" value={ventasEfectivo} />
-          <MoneyRow label="Ventas transferencia" value={detalle.totalTransferencia} />
-          <MoneyRow label="Efectivo a rendir" value={totalEfectivoARendir} strong />
-          <MoneyRow label="Total general a rendir" value={totalGeneralARendir} strong />
+          <MoneyRow
+            label="Fondo inicial efectivo"
+            value={detalle.montoInicial}
+          />
+
+          <MoneyRow
+            label="Ventas efectivo"
+            value={ventasEfectivo}
+          />
+
+          <MoneyRow
+            label="Ventas transferencia"
+            value={ventasTransferencia}
+          />
+
+          <MoneyRow
+            label="Ventas Mercado Pago"
+            value={ventasMercadoPago}
+          />
+
+          <View style={styles.separator} />
+
+          <MoneyRow
+            label="Efectivo a rendir"
+            value={totalEfectivoARendir}
+            strong
+          />
+
+          <MoneyRow
+            label="Total ventas"
+            value={detalle.totalGeneral}
+          />
+
+          <MoneyRow
+            label="Total general a rendir"
+            value={totalGeneralARendir}
+            strong
+          />
+
+          <View style={styles.separator} />
 
           <Text style={styles.muted}>
             Apertura: {formatDate(detalle.fechaApertura)}
@@ -127,14 +181,27 @@ export default function VentanillaCajaDetailScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Resumen tickets</Text>
+          <Text style={styles.sectionTitle}>Resumen de ventas</Text>
 
-          <InfoRow label="Ventas realizadas" value={detalle.cantidadVentas} />
-          <InfoRow label="Tickets digitales" value={detalle.ticketsDigitalesGenerados} />
-          <InfoRow label="Tickets físicos" value={detalle.ticketsFisicosVendidos} />
+          <InfoRow
+            label="Ventas realizadas"
+            value={detalle.cantidadVentas}
+          />
 
-          <Pressable style={styles.secondaryButton} onPress={goToItems}>
-            <Text style={styles.buttonText}>Ver items</Text>
+          <Text style={styles.helpText}>
+            Ventanilla trabaja únicamente con entradas físicas. El detalle de
+            impresión y estado de cada venta se encuentra dentro del listado de
+            ventas de la caja.
+          </Text>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.pressed,
+            ]}
+            onPress={goToItems}
+          >
+            <Text style={styles.buttonText}>Ver ventas</Text>
           </Pressable>
         </View>
       </AppLayout>
@@ -142,7 +209,13 @@ export default function VentanillaCajaDetailScreen() {
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: number }) {
+function InfoRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
   return (
     <View style={styles.moneyRow}>
       <Text style={styles.moneyLabel}>{label}</Text>
@@ -165,6 +238,7 @@ function MoneyRow({
       <Text style={strong ? styles.moneyLabelStrong : styles.moneyLabel}>
         {label}
       </Text>
+
       <Text style={strong ? styles.moneyValueStrong : styles.moneyValue}>
         {formatMoney(value)}
       </Text>
@@ -181,14 +255,21 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
   },
-  heroTitle: { color: "#FFFFFF", fontSize: 26, fontWeight: "900" },
+  heroTitle: {
+    color: "#FFFFFF",
+    fontSize: 26,
+    fontWeight: "900",
+  },
   heroTotal: {
     color: "#20D67B",
     fontSize: 34,
     fontWeight: "900",
     marginTop: 10,
   },
-  muted: { color: "#BDBDBD", marginTop: 6 },
+  muted: {
+    color: "#BDBDBD",
+    marginTop: 6,
+  },
   card: {
     backgroundColor: "rgba(255,255,255,0.07)",
     borderRadius: 22,
@@ -209,8 +290,14 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8,
   },
-  moneyLabel: { color: "#BDBDBD", flex: 1 },
-  moneyValue: { color: "#FFFFFF", fontWeight: "900" },
+  moneyLabel: {
+    color: "#BDBDBD",
+    flex: 1,
+  },
+  moneyValue: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+  },
   moneyLabelStrong: {
     color: "#FFFFFF",
     flex: 1,
@@ -222,6 +309,17 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: 18,
   },
+  separator: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    marginVertical: 10,
+  },
+  helpText: {
+    color: "#9B9B9B",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 12,
+  },
   secondaryButton: {
     backgroundColor: "rgba(255,255,255,0.12)",
     padding: 14,
@@ -229,5 +327,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 14,
   },
-  buttonText: { color: "#FFFFFF", fontWeight: "900" },
+  buttonText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+  },
+  pressed: {
+    opacity: 0.82,
+  },
 });

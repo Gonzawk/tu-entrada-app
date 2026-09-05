@@ -2,18 +2,19 @@ import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import {
-    actualizarImagenesEventoAdminApi,
-    subirImagenAdminApi,
+  actualizarDatosBasicosEventoAdminApi,
+  actualizarImagenesEventoAdminApi,
+  subirImagenAdminApi,
 } from "../../../api/adminApi";
 import { getEventoDetalleAdminApi } from "../../../api/eventsApi";
 import { AppLayout } from "../../../components/shared/AppLayout";
@@ -22,10 +23,14 @@ import { RoleGuard } from "../../../components/shared/RoleGuard";
 type EventoAdminDetalle = {
   id: number;
   nombre: string;
+  descripcion?: string | null;
+
   lugar?: string | null;
   fechaInicio: string;
+
   bannerUrl?: string | null;
   imagenPrincipalUrl?: string | null;
+
   estado: string | number;
 };
 
@@ -103,11 +108,18 @@ export default function AdminEventImagesScreen() {
 
   const [loading, setLoading] = useState(true);
   const [actualizando, setActualizando] = useState(false);
-  const [guardando, setGuardando] = useState(false);
+  const [guardandoDatos, setGuardandoDatos] = useState(false);
+  const [guardandoImagenes, setGuardandoImagenes] = useState(false);
   const [uploadingField, setUploadingField] = useState<ImageField | null>(null);
 
   const [bannerInicial, setBannerInicial] = useState("");
   const [imagenPrincipalInicial, setImagenPrincipalInicial] = useState("");
+
+  const [nombre, setNombre] = useState("");
+  const [descripcion, setDescripcion] = useState("");
+
+  const [nombreInicial, setNombreInicial] = useState("");
+  const [descripcionInicial, setDescripcionInicial] = useState("");
 
   const cargarDatos = useCallback(
     async (modoActualizacion = false) => {
@@ -128,10 +140,18 @@ export default function AdminEventImagesScreen() {
           id,
         )) as EventoAdminDetalle;
 
+        const nombreEvento = data.nombre ?? "";
+        const descripcionEvento = data.descripcion ?? "";
         const banner = data.bannerUrl ?? "";
         const principal = data.imagenPrincipalUrl ?? "";
 
         setEvento(data);
+
+        setNombre(nombreEvento);
+        setDescripcion(descripcionEvento);
+        setNombreInicial(nombreEvento);
+        setDescripcionInicial(descripcionEvento);
+
         setBannerUrl(banner);
         setImagenPrincipalUrl(principal);
         setBannerInicial(banner);
@@ -166,9 +186,21 @@ export default function AdminEventImagesScreen() {
     }, [cargarDatos]),
   );
 
-  const tieneCambios =
+  const tieneCambiosDatos =
+    nombre.trim() !== nombreInicial.trim() ||
+    descripcion.trim() !== descripcionInicial.trim();
+
+  const tieneCambiosImagenes =
     bannerUrl.trim() !== bannerInicial.trim() ||
     imagenPrincipalUrl.trim() !== imagenPrincipalInicial.trim();
+
+  const tieneCambios =
+    tieneCambiosDatos || tieneCambiosImagenes;
+
+  const bloqueado =
+    guardandoDatos ||
+    guardandoImagenes ||
+    uploadingField !== null;
 
   async function seleccionarYSubirImagen(field: ImageField) {
     if (uploadingField !== null) {
@@ -317,12 +349,96 @@ export default function AdminEventImagesScreen() {
           text: "Restaurar",
           style: "destructive",
           onPress: () => {
+            setNombre(nombreInicial);
+            setDescripcion(descripcionInicial);
             setBannerUrl(bannerInicial);
             setImagenPrincipalUrl(imagenPrincipalInicial);
           },
         },
       ],
     );
+  }
+
+  async function guardarDatosBasicos() {
+    const nombreLimpio = nombre.trim();
+    const descripcionLimpia = descripcion.trim();
+
+    if (!nombreLimpio) {
+      Alert.alert(
+        "Nombre requerido",
+        "El evento debe tener un nombre."
+      );
+      return;
+    }
+
+    if (nombreLimpio.length > 150) {
+      Alert.alert(
+        "Nombre demasiado largo",
+        "El nombre no puede superar los 150 caracteres."
+      );
+      return;
+    }
+
+    if (descripcionLimpia.length > 2000) {
+      Alert.alert(
+        "Descripción demasiado larga",
+        "La descripción no puede superar los 2000 caracteres."
+      );
+      return;
+    }
+
+    try {
+      setGuardandoDatos(true);
+
+      const result =
+        await actualizarDatosBasicosEventoAdminApi(
+          id,
+          {
+            nombre: nombreLimpio,
+            descripcion: descripcionLimpia || null,
+          }
+        );
+
+      setEvento((current) =>
+        current
+          ? {
+              ...current,
+              nombre: result?.nombre ?? nombreLimpio,
+              descripcion:
+                result?.descripcion ??
+                (descripcionLimpia || null),
+            }
+          : current
+      );
+
+      setNombre(nombreLimpio);
+      setDescripcion(descripcionLimpia);
+      setNombreInicial(nombreLimpio);
+      setDescripcionInicial(descripcionLimpia);
+
+      Alert.alert(
+        "Evento actualizado",
+        "El nombre y la descripción fueron actualizados correctamente."
+      );
+    } catch (error: any) {
+      console.log("ERROR DATOS EVENTO:", {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message,
+        url: error?.config?.url,
+        method: error?.config?.method,
+      });
+
+      Alert.alert(
+        "No se pudo guardar",
+        getApiErrorMessage(
+          error,
+          "No se pudieron actualizar los datos del evento."
+        )
+      );
+    } finally {
+      setGuardandoDatos(false);
+    }
   }
 
   async function guardarImagenes() {
@@ -338,7 +454,7 @@ export default function AdminEventImagesScreen() {
     }
 
     try {
-      setGuardando(true);
+      setGuardandoImagenes(true);
 
       await actualizarImagenesEventoAdminApi(id, {
         bannerUrl: bannerLimpio,
@@ -371,17 +487,17 @@ export default function AdminEventImagesScreen() {
         ),
       );
     } finally {
-      setGuardando(false);
+      setGuardandoImagenes(false);
     }
   }
 
   if (loading) {
     return (
       <RoleGuard allowedRoles={["Admin", "SuperAdmin"]}>
-        <AppLayout title="Imágenes del evento">
+        <AppLayout title="Editar evento">
           <View style={styles.loaderContainer}>
             <ActivityIndicator color="#E50914" size="large" />
-            <Text style={styles.loaderText}>Cargando imágenes...</Text>
+            <Text style={styles.loaderText}>Cargando evento...</Text>
           </View>
         </AppLayout>
       </RoleGuard>
@@ -390,13 +506,14 @@ export default function AdminEventImagesScreen() {
 
   return (
     <RoleGuard allowedRoles={["Admin", "SuperAdmin"]}>
-      <AppLayout title="Imágenes del evento">
+      <AppLayout title="Editar evento">
         {evento ? (
           <View style={styles.eventCard}>
-            {evento.bannerUrl ? (
+            {bannerUrl.trim() ? (
               <Image
-                source={{ uri: evento.bannerUrl }}
+                source={{ uri: bannerUrl.trim() }}
                 style={styles.eventBanner}
+                resizeMode="cover"
               />
             ) : (
               <View style={styles.eventBannerPlaceholder}>
@@ -409,7 +526,9 @@ export default function AdminEventImagesScreen() {
             <View style={styles.eventInfo}>
               <View style={styles.eventTitleRow}>
                 <View style={styles.flex}>
-                  <Text style={styles.title}>{evento.nombre}</Text>
+                  <Text style={styles.title}>
+                    {nombre.trim() || evento.nombre}
+                  </Text>
 
                   {evento.lugar ? (
                     <Text style={styles.muted}>{evento.lugar}</Text>
@@ -430,6 +549,76 @@ export default function AdminEventImagesScreen() {
           </View>
         ) : null}
 
+        <View style={styles.basicDataCard}>
+          <Text style={styles.sectionTitle}>
+            Datos básicos
+          </Text>
+
+          <Text style={styles.sectionSubtitle}>
+            Podés modificar el nombre y la descripción incluso después de
+            publicar el evento.
+          </Text>
+
+          <Text style={styles.formLabel}>
+            Nombre del evento
+          </Text>
+
+          <TextInput
+            value={nombre}
+            onChangeText={setNombre}
+            placeholder="Ej: SAVAGE"
+            placeholderTextColor="#777777"
+            editable={!guardandoDatos}
+            maxLength={150}
+            style={[
+              styles.input,
+              guardandoDatos && styles.inputDisabled,
+            ]}
+          />
+
+          <Text style={styles.formLabel}>
+            Descripción
+          </Text>
+
+          <TextInput
+            value={descripcion}
+            onChangeText={setDescripcion}
+            placeholder="Descripción del evento..."
+            placeholderTextColor="#777777"
+            editable={!guardandoDatos}
+            multiline
+            maxLength={2000}
+            textAlignVertical="top"
+            style={[
+              styles.input,
+              styles.descriptionInput,
+              guardandoDatos && styles.inputDisabled,
+            ]}
+          />
+
+          <Text style={styles.counterText}>
+            {descripcion.length}/2000
+          </Text>
+
+          <Pressable
+            style={[
+              styles.primaryButton,
+              (!tieneCambiosDatos || guardandoDatos) &&
+                styles.disabledButton,
+            ]}
+            onPress={() => void guardarDatosBasicos()}
+            disabled={!tieneCambiosDatos || guardandoDatos}
+          >
+            {guardandoDatos ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.buttonText}>
+                Guardar datos básicos
+              </Text>
+            )}
+          </Pressable>
+        </View>
+
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Presentación visual</Text>
           <Text style={styles.infoText}>
@@ -445,7 +634,7 @@ export default function AdminEventImagesScreen() {
           value={bannerUrl}
           previewStyle={styles.bannerPreview}
           uploading={uploadingField === "banner"}
-          disabled={guardando || uploadingField !== null}
+          disabled={guardandoImagenes || uploadingField !== null}
           onChange={setBannerUrl}
           onUpload={() => void seleccionarYSubirImagen("banner")}
           onRemove={() => limpiarImagen("banner")}
@@ -457,7 +646,7 @@ export default function AdminEventImagesScreen() {
           value={imagenPrincipalUrl}
           previewStyle={styles.mainImagePreview}
           uploading={uploadingField === "principal"}
-          disabled={guardando || uploadingField !== null}
+          disabled={guardandoImagenes || uploadingField !== null}
           onChange={setImagenPrincipalUrl}
           onUpload={() => void seleccionarYSubirImagen("principal")}
           onRemove={() => limpiarImagen("principal")}
@@ -466,11 +655,11 @@ export default function AdminEventImagesScreen() {
         <View style={styles.changesBox}>
           <View style={styles.changesContent}>
             <Text style={styles.changesTitle}>
-              {tieneCambios ? "Cambios pendientes" : "Todo actualizado"}
+              {tieneCambiosImagenes ? "Cambios pendientes" : "Todo actualizado"}
             </Text>
 
             <Text style={styles.changesText}>
-              {tieneCambios
+              {tieneCambiosImagenes
                 ? "Las imágenes seleccionadas todavía no fueron asociadas al evento."
                 : "Las imágenes visibles coinciden con las guardadas en el servidor."}
             </Text>
@@ -479,7 +668,7 @@ export default function AdminEventImagesScreen() {
           <View
             style={[
               styles.changesIndicator,
-              tieneCambios
+              tieneCambiosImagenes
                 ? styles.changesIndicatorPending
                 : styles.changesIndicatorSaved,
             ]}
@@ -489,15 +678,19 @@ export default function AdminEventImagesScreen() {
         <Pressable
           style={[
             styles.primaryButton,
-            (!tieneCambios ||
-              guardando ||
+            (!tieneCambiosImagenes ||
+              guardandoImagenes ||
               uploadingField !== null) &&
               styles.disabledButton,
           ]}
           onPress={() => void guardarImagenes()}
-          disabled={!tieneCambios || guardando || uploadingField !== null}
+          disabled={
+            !tieneCambiosImagenes ||
+            guardandoImagenes ||
+            uploadingField !== null
+          }
         >
-          {guardando ? (
+          {guardandoImagenes ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.buttonText}>Guardar imágenes</Text>
@@ -508,10 +701,10 @@ export default function AdminEventImagesScreen() {
           <Pressable
             style={[
               styles.secondaryButton,
-              (!tieneCambios || guardando) && styles.disabledButton,
+              (!tieneCambios || bloqueado) && styles.disabledButton,
             ]}
             onPress={restaurarCambios}
-            disabled={!tieneCambios || guardando}
+            disabled={!tieneCambios || bloqueado}
           >
             <Text style={styles.buttonText}>Descartar cambios</Text>
           </Pressable>
@@ -519,10 +712,10 @@ export default function AdminEventImagesScreen() {
           <Pressable
             style={[
               styles.refreshButton,
-              (actualizando || guardando) && styles.disabledButton,
+              (actualizando || bloqueado) && styles.disabledButton,
             ]}
             onPress={() => void cargarDatos(true)}
-            disabled={actualizando || guardando}
+            disabled={actualizando || bloqueado}
           >
             {actualizando ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
@@ -701,6 +894,29 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
+  basicDataCard: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    padding: 15,
+    marginTop: 14,
+  },
+
+  sectionTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+
+  sectionSubtitle: {
+    color: "#929292",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+
   infoBox: {
     backgroundColor: "rgba(229,9,20,0.08)",
     borderRadius: 18,
@@ -787,6 +1003,19 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     paddingHorizontal: 13,
   },
+  descriptionInput: {
+    minHeight: 120,
+    paddingTop: 13,
+    paddingBottom: 13,
+  },
+
+  counterText: {
+    color: "#777777",
+    fontSize: 11,
+    textAlign: "right",
+    marginTop: 5,
+  },
+
   inputDisabled: {
     opacity: 0.55,
   },

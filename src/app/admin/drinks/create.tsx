@@ -39,6 +39,8 @@ export default function AdminCreateDrinkScreen() {
 
   const [precioBase, setPrecioBase] = useState("");
   const [disponibleGlobal, setDisponibleGlobal] = useState(true);
+  const [manejaStock, setManejaStock] = useState(false);
+  const [stockDisponible, setStockDisponible] = useState("0");
   const [activo, setActivo] = useState(true);
 
   const [loadingEdit, setLoadingEdit] = useState(false);
@@ -69,6 +71,8 @@ export default function AdminCreateDrinkScreen() {
         setImagenUrl(bebida.imagenUrl ?? "");
         setPrecioBase(String(bebida.precioBase));
         setDisponibleGlobal(bebida.disponibleGlobal);
+        setManejaStock(Boolean(bebida.manejaStock));
+        setStockDisponible(String(bebida.stockDisponible ?? 0));
         setActivo(bebida.activo);
       } catch {
         Alert.alert("Error", "No se pudo cargar la bebida.");
@@ -125,6 +129,7 @@ export default function AdminCreateDrinkScreen() {
 
   function crearFormData(
   precio: number,
+  stock: number,
   finalImagenUrl: string
 ) {
   const formData = new FormData();
@@ -147,6 +152,16 @@ export default function AdminCreateDrinkScreen() {
   formData.append(
     "disponibleGlobal",
     String(disponibleGlobal)
+  );
+
+  formData.append(
+    "manejaStock",
+    String(manejaStock)
+  );
+
+  formData.append(
+    "stockDisponible",
+    String(manejaStock ? stock : 0)
   );
 
   if (isEdit) {
@@ -188,6 +203,24 @@ export default function AdminCreateDrinkScreen() {
       return;
     }
 
+    const stock = Number(
+      stockDisponible.replace(",", ".")
+    );
+
+    if (
+      manejaStock &&
+      (
+        !Number.isInteger(stock) ||
+        stock < 0
+      )
+    ) {
+      Alert.alert(
+        "Stock inválido",
+        "Ingresá una cantidad entera de stock igual o mayor a cero."
+      );
+      return;
+    }
+
     setSaving(true);
 
     /*
@@ -212,6 +245,7 @@ export default function AdminCreateDrinkScreen() {
      */
     const formData = crearFormData(
       precio,
+      manejaStock ? stock : 0,
       finalImagenUrl
     );
 
@@ -296,6 +330,12 @@ export default function AdminCreateDrinkScreen() {
           <Text style={disponibleGlobal ? styles.active : styles.inactive}>
             {disponibleGlobal ? "Disponible" : "No disponible"}
           </Text>
+
+          <Text style={manejaStock ? styles.stockActive : styles.stockInactive}>
+            {manejaStock
+              ? `Stock global libre: ${Number(stockDisponible || 0)}`
+              : "Sin control de stock"}
+          </Text>
         </View>
 
         <View style={styles.form}>
@@ -337,6 +377,39 @@ export default function AdminCreateDrinkScreen() {
               {disponibleGlobal ? "Disponible globalmente" : "No disponible"}
             </Text>
           </Pressable>
+
+          <Pressable
+            style={manejaStock ? styles.toggleOn : styles.toggleOff}
+            onPress={() => {
+              const next = !manejaStock;
+              setManejaStock(next);
+
+              if (!next) {
+                setStockDisponible("0");
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>
+              {manejaStock
+                ? "Control de stock activo"
+                : "Sin control de stock"}
+            </Text>
+          </Pressable>
+
+          {manejaStock ? (
+            <Input
+              label="Stock global disponible"
+              value={stockDisponible}
+              setValue={setStockDisponible}
+              keyboardType="numeric"
+            />
+          ) : null}
+
+          {manejaStock ? (
+            <Text style={styles.helperText}>
+              Este stock representa unidades globales libres. Las unidades asignadas a promociones de eventos se administran por separado.
+            </Text>
+          ) : null}
 
           {isEdit ? (
             <Pressable
@@ -450,6 +523,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: "900",
   },
+  stockActive: {
+    color: "#20D67B",
+    marginTop: 6,
+    fontWeight: "800",
+  },
+  stockInactive: {
+    color: "#9A9A9A",
+    marginTop: 6,
+    fontWeight: "800",
+  },
   form: {
     backgroundColor: "rgba(255,255,255,0.07)",
     padding: 14,
@@ -464,6 +547,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     backgroundColor: "rgba(255,255,255,0.10)",
     color: "#FFFFFF",
+  },
+  helperText: {
+    color: "#AFAFAF",
+    fontSize: 12,
+    lineHeight: 18,
+    paddingHorizontal: 4,
   },
   imageButton: {
     backgroundColor: "rgba(255,255,255,0.12)",

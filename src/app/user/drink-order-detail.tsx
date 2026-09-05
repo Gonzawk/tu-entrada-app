@@ -1,9 +1,10 @@
 import { useLocalSearchParams } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -20,13 +21,24 @@ import { AppLayout } from "../../components/shared/AppLayout";
 import { RoleGuard } from "../../components/shared/RoleGuard";
 import { connectRealtime } from "../../services/realtimeService";
 import { BebidaOrden, BebidaOrdenItem } from "../../types/drinks";
-import { formatDate } from "../../utils/formatDate";
+import { formatDate, formatUtcDate } from "../../utils/formatDate";
 import { formatMoney } from "../../utils/formatMoney";
 
 // BebidaOrdenItem (types/drinks) no declara descripcionProducto, descripcion
 // ni productoDescripcion, pero el backend puede enviarlos y este componente
 // los usa como fallback en cascada. Se extiende acá como opcionales, sin
 // tocar el tipo compartido, para no afectar otras pantallas.
+
+async function abrirCheckoutPago(checkoutUrl: string): Promise<void> {
+  const url = checkoutUrl.trim();
+
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error("La URL de pago recibida no es válida.");
+  }
+
+  await Linking.openURL(url);
+}
+
 type BebidaOrdenItemConDescripcion = BebidaOrdenItem & {
   descripcionProducto?: string | null;
   descripcion?: string | null;
@@ -73,8 +85,11 @@ export default function UserDrinkOrderDetailScreen() {
         return;
       }
 
-      await WebBrowser.openBrowserAsync(checkoutUrl);
-      await load(false);
+      await abrirCheckoutPago(checkoutUrl);
+
+      // Linking.openURL entrega el checkout al navegador del sistema y retorna
+      // inmediatamente. La orden se refresca al volver a primer plano mediante
+      // el listener de AppState definido debajo.
     } catch (e: unknown) {
       Alert.alert("No se pudo reintentar", String(getErrorMessage(e)));
       await load(false);
@@ -86,6 +101,27 @@ export default function UserDrinkOrderDetailScreen() {
   useEffect(() => {
     if (!id) return;
     load(true);
+  }, [id, load]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    let previousState = AppState.currentState;
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const estabaFuera =
+        previousState === "inactive" || previousState === "background";
+
+      if (estabaFuera && nextState === "active") {
+        void load(false);
+      }
+
+      previousState = nextState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, [id, load]);
 
   useEffect(() => {
@@ -193,8 +229,8 @@ export default function UserDrinkOrderDetailScreen() {
               ) : null}
 
               <Text style={styles.muted}>
-                Creada: {formatDate(orden.fechaCreacion)}
-              </Text>
+  Creada: {formatUtcDate(orden.fechaCreacion)}
+</Text>
             </View>
 
             {esBeneficio ? (

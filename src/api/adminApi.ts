@@ -259,6 +259,21 @@ export async function actualizarImagenesEventoAdminApi(
   return response.data;
 }
 
+export async function actualizarDatosBasicosEventoAdminApi(
+  eventoId: number,
+  data: {
+    nombre: string;
+    descripcion?: string | null;
+  }
+) {
+  const response = await apiClient.put(
+    `/api/eventos/${eventoId}/datos-basicos`,
+    data
+  );
+
+  return response.data;
+}
+
 export async function actualizarImagenTipoEntradaAdminApi(
   tipoEntradaId: number,
   imagenUrl: string
